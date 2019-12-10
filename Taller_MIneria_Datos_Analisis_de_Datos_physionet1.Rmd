@@ -57,6 +57,9 @@ data_paciente_132539=read_csv("data_basic_physionet/set-a/132539.txt", col_types
 data_paciente_132539 %>% separate(Time, 
            into = c("horas", "minutos"),
            sep = ":", convert = TRUE) 
+           into = c("horas", "min"),
+           sep = ":", convert = TRUE) %>%
+          transmute(Time_min = horas*60 + min,Parameter, Value)
 str(data_paciente_132539)
 glimpse(data_paciente_132539)
 class(data_paciente_132539)
