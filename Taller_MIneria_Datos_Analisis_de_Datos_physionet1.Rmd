@@ -59,6 +59,10 @@ lista_pacientes_set_a[1]
 
 ```{r}
 data_paciente_132539=read_csv("data_basic_physionet/set-a/132539.txt", col_types =cols(Time=col_time(format="%M:%S"),Parameter=col_character(),Value=col_double()))
+data_paciente_132539=read_csv("data_basic_physionet/set-a/132539.txt", col_types =cols(Time=col_character(),Parameter=col_character(),Value=col_double()))
+data_paciente_132539 %>% separate(Time, 
+           into = c("horas", "minutos"),
+           sep = ":", convert = TRUE)
 str(data_paciente_132539)
 glimpse(data_paciente_132539)
 class(data_paciente_132539)
