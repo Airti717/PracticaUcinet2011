@@ -55,8 +55,6 @@ lista_pacientes_set_a[1]
 ```{r}
 data_paciente_132539=read_csv("data_basic_physionet/set-a/132539.txt", col_types =cols(Time=col_character(),Parameter=col_character(),Value=col_double()))
 data_paciente_132539 %>% separate(Time, 
-           into = c("horas", "minutos"),
-           sep = ":", convert = TRUE) 
            into = c("horas", "min"),
            sep = ":", convert = TRUE) %>%
           transmute(Time_min = horas*60 + min,Parameter, Value)
