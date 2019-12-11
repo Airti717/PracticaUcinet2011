@@ -65,8 +65,7 @@ data_paciente_132539 = read_csv("data_basic_physionet/set-a/132539.txt",
 
 # Separamos las horas de los minutos de la columna Time para acto seguido poner una sola columna llamada Time_min sólo con los minutos en que se tomaron los datos.
                           separate(Time, into = c("horas", "min"),sep = ":", convert = TRUE) %>% 
-                          transmute(Parameter, Value,Time_min = as.numeric(horas)*60 + as.numeric(min)) %>%
-                          mutate(Time_as_time = hms::as.hms(Time_min*60) )
+                          transmute(Parameter, Value,Time_min = as.numeric(horas)*60 + as.numeric(min))
 
 # Mostramos un resumen con la estructura del conjunto de datos.1
 str(data_paciente_132539)
