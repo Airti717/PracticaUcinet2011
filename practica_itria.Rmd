@@ -3,14 +3,19 @@ title: "Carga inicial datos: Physionet 2012 UCI data mortality"
 author: "Ricardo Alberich, Irene Garcia"
 time:  "`Sys.Date()`"
 output: 
+  pdf_document: 
+    number_sections: yes
+    toc: yes
   html_document: 
     keep_md: yes
     number_sections: yes
     toc: yes
-  pdf_document: 
-    number_sections: yes
-    toc: yes
 ---
+
+```{r setup0, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,cache=TRUE)
+library("tidyverse")
+```
 
 # Introducción: Physionet 2012 UCI data mortality
 
@@ -36,87 +41,87 @@ Resto de años mas recientes
 #  Ingesta de datos
 
 
-Antes que nada  hacemos inicializamos  con cache a TRUE y cargando  tidyverse.
-
-```{r setup}
-knitr::opts_chunk$set(echo = TRUE,cache=TRUE)
-library("tidyverse")
-```
-
 ## Modelo de datos 
 
 ```{r}
 # Cargamos los datos
-path = "data_basic_physionet/set-a/"
+path = "data_basic_physionet/set-a/"# path training
 # Creamos un vector con los nombres de los archivos
-lista_pacientes_set_a = dir(path)
+lista_pacientes_set_a = dir(path) # lista  ficheros pacientes 
 # Printamos número de archivos que leemos
-length(lista_pacientes_set_a)
+length(lista_pacientes_set_a) # número pacientes en training
 # Mostramos como ejemplo el nombre del documento 1 de los datos 
 lista_pacientes_set_a[1]
+
 ```
 
-```{r}
-# Creamos una lista a partir de la tabla de datos que se encuentra en el archivo de texto 1.
-data_paciente_132539 = read_csv("data_basic_physionet/set-a/132539.txt",
-                                col_types = cols(Time = col_character(),# Leemos el tiempo como carácter y después haremos                                                                           un ajuste que nos lo simplifique todo a minutos.
-                                                 Parameter = col_character(),
-                                                 Value = col_double()))%>%
 
-# Separamos las horas de los minutos de la columna Time para acto seguido poner una sola columna llamada Time_min sólo con los minutos en que se tomaron los datos.
-                          separate(Time, into = c("horas", "min"),sep = ":", convert = TRUE) %>% 
-                          transmute(Parameter, Value,Time_min = as.numeric(horas)*60 + as.numeric(min)) %>%
-                          mutate(Time_as_time = hms::as.hms(Time_min*60) )
-
-# Mostramos un resumen con la estructura del conjunto de datos.1
+```
+data_paciente_132539=read_csv("data_basic_physionet/set-a/132539.txt", col_types =cols(Time=col_time(format="%M:%S"),Parameter=col_character(),
+Value=col_double()))
 str(data_paciente_132539)
-# Printamos horizontalmente los datos de forma resumida.
 glimpse(data_paciente_132539)
-# Muestra la clase a la clase a la que pertenece el conjunto de datos.
 class(data_paciente_132539)
-# Impresión del conjunto de datos hasta la observación número 30.
 head(data_paciente_132539,30)
-
-
 ```
 
 ## Carga set_a
 
 ```{r}
-# lista path's  a cada  fichero de paciente
+# lista path's  a cada  ficjero de paciente
 list_files = paste0(path,lista_pacientes_set_a)
 # Función leer paciente
-leer_paciente = function(file) read_csv(file, col_types =cols(Time=col_time(format="%M:%S"),
-                                                            Parameter=col_character(),Value=col_double()))
-raw_data=lapply(list_files,leer_paciente)
+# Leemos el tiempo como carácter y después haremos un ajuste que nos lo simplifique todo a minutos.  
+leer_paciente = function(file){read_csv(file, col_types = cols(Time = col_character(),
+                                                               Parameter = col_character(),
+                                                               Value = col_double())) %>%
+# Separamos las horas de los minutos de la columna Time para acto seguido poner una sola columna 
+# llamada Time_min sólo con los minutos en que se tomaron los datos.
+                              separate(Time,into = c("H","M"),sep = ":") %>% 
+                              mutate(Time_Minutes = as.numeric(H)*60+as.numeric(M)) %>% 
+                              select(Time_Minutes,Parameter,Value)}
 
-#extraer perfiles     "RecordID"    "Age"    "Gender"  "Height"   "Weight"   "ICUType" 
+#leer_paciente(list_files[1])
+raw_data = lapply(list_files,leer_paciente) # lista de los datos por paciente
+
+#extraer perfiles "RecordID" "Age"      "Gender"   "Height"   "Weight"   "ICUType" 
 perfil = function(data_paciente){
-  data_paciente %>% filter(Parameter %in% c("RecordID", "Age", "Gender", "Height", "ICUType", "Weight")) %>% select(-Time) %>% distinct(Parameter,.keep_all = TRUE) %>% spread(Parameter,Value)
-}
+            data_paciente %>%
+            filter(Parameter %in% c("RecordID","Age","Gender","Height","ICUType","Weight")) %>%
+            select(-Time_Minutes) %>%
+            distinct(Parameter,.keep_all = TRUE) %>%
+            spread(Parameter,Value) }
 ## ejemplo
-perfil(data_paciente_132539)
-perfiles = lapply(raw_data,perfil)%>% bind_rows() %>% select(RecordID, Age, Gender, Height,Weight,ICUType)
-## Leer series
+#perfil(data_paciente_132539)
+## Guardo  todos los datos  del perfil de cada paciente
+perfiles =  lapply(raw_data,perfil) %>%
+            bind_rows() %>%
+            select(RecordID, Age, Gender, Height,Weight,ICUType)
 
-serie_UCI_parameter <-  function(paciente,parameters){paciente %>%
-                                                      arrange(Parameter,Time) %>%
+glimpse(perfiles)
+## Ler series
+## se modifica error de time
+
+serie_UCI_parameter <- function(paciente,parameters){ paciente %>%
+                                                      arrange(Parameter,Time_Minutes) %>%
                                                       filter(Parameter %in% parameters) %>%
-                                                      add_column(RecordID = paciente[1,3]$Value)} 
-
+                                                      add_column(RecordID=paciente[1,3]$Value) } 
 ##ejemplo
 parameters = c("HR","RespRate","GCS")
 serie_paciente1 = serie_UCI_parameter(raw_data[[1]],parameters)
 serie_paciente1
-# paso apilo 
+# paso parámetros y  apilo 
 parameters = c("HR","RespRate","GCS")
-series_parameters = lapply(raw_data,FUN = function(x) serie_UCI_parameter(x,parameters)) %>% bind_rows()
-
+series_parameters = lapply(raw_data,FUN=function(x) serie_UCI_parameter(x,parameters)) %>%
+                    bind_rows()
+glimpse(series_parameters)
 ```
 
 
 
-En resumen  tenemos
+
+
+## En resumen  tenemos
 
 ```{r}
 #set-a
@@ -126,7 +131,7 @@ glimpse(series_parameters)
 
 
 
-## Leer Scores y unificar: series, perfiles y scores
+## Unificar: series, perfiles y scores
 
 Nos faltan los scores clásicos que se utilizan eb las ICU. Estos ewstán el fichero Outcome-a.txt para el set-a
 
@@ -141,21 +146,22 @@ glimpse(Scores_perfilesA)
 ```
 
 
+### Extracción factores de las series 
 
+genero una tabla con resumenes de  las variables por paciente: media, desviación típica 
 
+```{r}
+series_summary =  series_parameters %>%
+                  group_by(RecordID,Parameter) %>%
+                  summarise(count = n(),mean = mean(Value,na.rm = TRUE),
+                            sd = sd(Value,na.rm=TRUE)) %>%
+                  gather(Stat, Value, count:sd) %>%
+                  ungroup() %>%
+                  transmute(RecordID,ParameterStat = paste0(Parameter,"_",Stat),Value) %>%
+                  spread(ParameterStat, Value)
+```
 
 
 ```{r}
-series_parameters %<>% inner_join(perfiles,by = "RecordID") %>% inner_join(scoresA,by = "RecordID")
+data_tidy = Scores_perfilesA %>% inner_join(series_summary)
 ```
-
-Añado tiempos en segundos y el rango
-
-```{r}
-series_parameters %<>%  group_by(RecordID,Parameter) %>%
-                        mutate(Time_Diff = c(Time[1]-0,diff(Time,lag = 1)),Order_Time=row_number())%>%
-                        mutate(Seconds=cumsum(as.numeric(Time_Diff)))
-all(series_parameters$Time_Diff>=0)
-```
-
-
