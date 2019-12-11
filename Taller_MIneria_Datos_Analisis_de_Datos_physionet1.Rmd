@@ -61,20 +61,23 @@ lista_pacientes_set_a[1]
 data_paciente_132539 = read_csv("data_basic_physionet/set-a/132539.txt",
                                 col_types = cols(Time = col_character(),# Leemos el tiempo como carácter y después haremos                                                                           un ajuste que nos lo simplifique todo a minutos.
                                                  Parameter = col_character(),
-                                                 Value = col_double()))
+                                                 Value = col_double()))%>%
 
 # Separamos las horas de los minutos de la columna Time para acto seguido poner una sola columna llamada Time_min sólo con los minutos en que se tomaron los datos.
-data_paciente_132539 %<>%  separate(Time, into = c("horas", "min"),sep = ":", convert = TRUE) %>% 
-                          transmute(Parameter, Value,Time_min = horas*60 + min)
+                          separate(Time, into = c("horas", "min"),sep = ":", convert = TRUE) %>% 
+                          transmute(Parameter, Value,Time_min = as.numeric(horas)*60 + as.numeric(min)) %>%
+                          mutate(Time_as_time = hms::as.hms(Time_min*60) )
 
-# Mostramos un resumen con la estructura del conjunto de datos.
+# Mostramos un resumen con la estructura del conjunto de datos.1
 str(data_paciente_132539)
 # Printamos horizontalmente los datos de forma resumida.
 glimpse(data_paciente_132539)
-# ???????????????????????? 
+# Muestra la clase a la clase a la que pertenece el conjunto de datos.
 class(data_paciente_132539)
 # Impresión del conjunto de datos hasta la observación número 30.
 head(data_paciente_132539,30)
+
+
 ```
 
 ## Carga set_a
