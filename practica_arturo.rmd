@@ -14,6 +14,8 @@ output:
 
 ```{r setup0, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,cache=TRUE)
+library("sp")
+library("naniar")
 library("tidyverse")
 ```
 
@@ -164,6 +166,44 @@ series_summary =  series_parameters %>%
 ```{r}
 data_tidy = Scores_perfilesA %>% inner_join(series_summary)
 ```
+
+Elimino NA
+
+```{r}
+aux=which(is.na(data_tidy$Lactate_count))
+length(aux)
+data_tidy2=data_tidy[-aux,]
+view(data_tidy2)
+```
+
+```{r}
+data_tidy3=drop_na(data_tidy)
+
+contar_nas = function(x){
+  sum(is.na(x))
+  
+}
+
+pocos_nas = function(x){
+  for(i in 1:length(data_tidy)){
+    if(contar_nas(x) >= 2000){
+      return(FALSE)
+    }
+    else{
+      return(TRUE)
+    }
+  }
+  
+}
+
+
+  apply(data_tidy, 2, pocos_nas)
+
+
+
+```
+
+
 
 ```
 hola= series_parameters %>% spread(Parameter,Value)
