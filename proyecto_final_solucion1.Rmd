@@ -82,7 +82,8 @@ leer_paciente = function(file){read_csv(file, col_types = cols(Time = col_charac
                               select(Time_Minutes,Parameter,Value)}
 
 #leer_paciente(list_files[1])
-raw_data = lapply(list_files,leer_paciente)# lista de los datos por paciente
+raw_data = lapply(list_files,leer_paciente) # lista de los datos por paciente
+
 #extraer perfiles "RecordID" "Age"      "Gender"   "Height"   "Weight"   "ICUType" 
 perfil = function(data_paciente){
             data_paciente %>%
