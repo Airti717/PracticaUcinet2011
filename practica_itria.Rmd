@@ -179,6 +179,8 @@ Dejamos de considerar por demasiados NA's:
 - Bilirubina
 - Lactate
 - Resp Rate
+
+
 ```{r}
 contar_nas = function(x){
   sum(is.na(x))
@@ -198,7 +200,6 @@ pocos_nas = function(x){
 }
 
 
-
 #data_tidy3 = drop_na(data_tidy)
 
 
@@ -214,6 +215,12 @@ nombres
 primera_seleccion = select(data_tidy, nombres)
 View(primera_seleccion)
 
+```
+
+
+Hacemos la selección de las 10 variables considerando aquellas que tienen menos NA's
+
+```{r}
 # DE LAS SELECCIONADAS, MIRAMOS LAS QUE TIENEN MENOS NA'S Y LAS REORDENAMOS PARA ELEGIR LAS 10 PRIMERAS
 pepe = select(primera_seleccion, ends_with("sd")) %>% apply(2, contar_nas)
 
@@ -225,7 +232,7 @@ nombres_def
 
 # SOLUCION CUTRE
 
-data_real_tidy = select(data_tidy, contains("RecordID"),  contains("Age"),  contains("Gender"),  contains("Height"),  contains("Weight"),  contains("ICUType"),  contains("SAPS-I"),  contains("SOFA"),  contains("Length_of_stay"),  contains("Susrvival"),  contains("In-hospital_death"), contains("HR"), contains("Temp"), contains("GCS"), contains("Creatinine"),  contains("BUN"),  contains("Urine"),  contains("HCT"),  contains("HCO3"),  contains("Platelets"),  contains("WBC"))
+data_real_tidy = select(data_tidy, contains("RecordID"),  contains("Age"),  contains("Gender"),  contains("Height"),  contains("Weight"),  contains("ICUType"),  contains("SAPS-I"),  contains("SOFA"),  contains("Length_of_stay"),  contains("Survival"),  contains("In-hospital_death"), contains("HR"), contains("Temp"), contains("GCS"), contains("Creatinine"),  contains("BUN"),  contains("Urine"),  contains("HCT"),  contains("HCO3"),  contains("Platelets"),  contains("WBC"))
 
 
 drop_na(data_real_tidy)
@@ -234,9 +241,10 @@ drop_na(data_real_tidy)
 #las que tengan mayores diferencias con las muertes de los in hospital death
 
 #comparaciones con un t.test, per saber si ses mitjanes son iguales o no, si soln iguales FUERA
-
 ```
 
+
+Para elegir las 5 que nos aporten mas información a la hora de predecir las muertes, realizamos los siguientes boxplots y contrastes de hipótesis para encontrar aquellas que la muerte y la vida tengan más variación.
 
 ```{r}
 # Hacemos contraste de hipótesis para saber si deberiamos considerar las
@@ -279,7 +287,7 @@ test_medias = function(columna){
 
 data_real_tidy$`In-hospital_death` = factor(data_real_tidy$`In-hospital_death`, labels = c("0","1"))
 
-# LATIDO CORAZON ----------------------------------------------------------------------------------------
+# LATIDO CORAZON -------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = HR_mean))
@@ -288,64 +296,63 @@ data_real_tidy %>%
 # Basta hacer solo el test de medias ya que dentro de este saldra la solucion del test de varianzas.
 test_medias(data_real_tidy$HR_mean)
 
-# TEMPERATURA ----------------------------------------------------------------------------------------
+# TEMPERATURA ----------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = Temp_mean))
 
 test_medias(data_real_tidy$Temp_mean)
 
-# GLASGOW ----------------------------------------------------------------------------------------
+# GLASGOW --------------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = GCS_mean))
 
 test_medias(data_real_tidy$GCS_mean)
 
-# CREATININA ----------------------------------------------------------------------------------------
+# CREATININA -----------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = Creatinine_mean))
 
 test_medias(data_real_tidy$Creatinine_mean)
 
-# NITROGENO EN SANGRE ----------------------------------------------------------------------------------------
+# NITROGENO EN SANGRE --------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = BUN_mean))
 
-test_varianzas(data_real_tidy$BUN_mean)
 test_medias(data_real_tidy$BUN_mean)
 
-# ORINA ----------------------------------------------------------------------------------------
+# ORINA ----------------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = Urine_mean))
 
 test_medias(data_real_tidy$Urine_mean)
 
-# HEMATOCRITO ----------------------------------------------------------------------------------------
+# HEMATOCRITO ----------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = HCT_mean))
 
-test_medias(data_real_tidy$HCT_mean)
+test_medias(data_real_tidy$HCT_mean) #Aqui aceptamos las medias, así HTC no nos interesa
 
-# SERUM BICARBONADO ----------------------------------------------------------------------------------------
+# SERUM BICARBONADO ----------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = HCO3_mean))
 
 test_medias(data_real_tidy$HCO3_mean)
 
-# PLAQUETAS ----------------------------------------------------------------------------------------
+# PLAQUETAS ------------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = Platelets_mean))
 
-test_medias(data_real_tidy$Platelets_mean)
+test_medias(data_real_tidy$Platelets_mean) #Aceptamos las medias, así Platelets no nos interesa
 
-# GLOBULOS BLANCOS SANGRE ----------------------------------------------------------------------------------------
+# GLOBULOS BLANCOS SANGRE ----------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = WBC_mean))
@@ -354,7 +361,7 @@ test_medias(data_real_tidy$WBC_mean)
 
 ```
 
-
+Hemos descubierto que Platelets y HTC no vale la pena considerarlos. Falta elegir de entre los 8 restantes, cuales son los que presentan mayor varianza. Ésto se puede ver mejor en los boxplot.
 
 
 ```
