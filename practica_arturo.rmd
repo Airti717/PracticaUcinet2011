@@ -3,11 +3,11 @@ title: "Carga inicial datos: Physionet 2012 UCI data mortality"
 author: "Ricardo Alberich, Irene Garcia"
 time:  "`Sys.Date()`"
 output: 
-  pdf_document: 
-    number_sections: yes
-    toc: yes
   html_document: 
     keep_md: yes
+    number_sections: yes
+    toc: yes
+  pdf_document: 
     number_sections: yes
     toc: yes
 ---
@@ -224,7 +224,7 @@ nombres_pocos_nas
 nombres_def = nombres_pocos_nas[1:10]
 nombres_def
 
-#SOLUCION CUTRE
+# SOLUCION CUTRE
 
 data_real_tidy = select(data_tidy, contains("RecordID"),  contains("Age"),  contains("Gender"),  contains("Height"),  contains("Weight"),  contains("ICUType"),  contains("SAPS-I"),  contains("SOFA"),  contains("Length_of_stay"),  contains("Susrvival"),  contains("In-hospital_death"), contains("HR"), contains("Temp"), contains("GCS"), contains("Creatinine"),  contains("BUN"),  contains("Urine"),  contains("HCT"),  contains("HCO3"),  contains("Platelets"),  contains("WBC"))
 
@@ -240,62 +240,123 @@ drop_na(data_real_tidy)
 
 
 ```{r}
+
+test_varianzas = function(columna){
+  # hip nula : varianzas iguales
+  # hip alternativa : diferentes 
+  x = var.test(columna[data_real_tidy$`In-hospital_death` == 0],
+               columna[data_real_tidy$`In-hospital_death` == 1])
+  alpha = x$p.value
+  if(alpha < 0.05){
+    print('Rechazamos: Las varianzas son diferentes')
+  }
+  else{
+    print('Aceptamos: Las varianzas son iguales')
+  }
+    
+}
+
+test_medias = function(columna){
+  # hip nula : medias son iguales 
+  # hip alternativa: se indica en alternative = c("two.sided", "less", "greater")
+  x = t.test(columna[data_real_tidy$`In-hospital_death`==0],
+             columna[data_real_tidy$`In-hospital_death`==1],
+             var.equal = TRUE)
+  alpha = x$p.value
+  if(alpha < 0.05){
+    print('Rechazamos: Las medias son diferentes')
+  }
+  else{
+    print('Aceptamos: Las medias son iguales')
+  }
+    
+}
+
+
 # SELECCIÓN 5 VARIABLES MÁS RELEVANTES PARA PREDECIR LA MUERTE
 
 data_real_tidy$`In-hospital_death` = factor(data_real_tidy$`In-hospital_death`, labels = c("0","1"))
 
+# LATIDO CORAZON ----------------------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = HR_mean))
 
+
+test_varianzas(data_real_tidy$HR_mean)
+test_medias(data_real_tidy$HR_mean)
+
+# TEMPERATURA ----------------------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = Temp_mean))
 
+test_varianzas(data_real_tidy$Temp_mean)
+test_medias(data_real_tidy$Temp_mean)
+
+# GLASGOW ----------------------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = GCS_mean))
 
+test_varianzas(data_real_tidy$GCS_mean)
+test_medias(data_real_tidy$GCS_mean)
+
+# CREATININA ----------------------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = Creatinine_mean))
 
+test_varianzas(data_real_tidy$Creatinine_mean)
+test_medias(data_real_tidy$Creatinine_mean)
+
+# NITROGENO EN SANGRE ----------------------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = BUN_mean))
 
+test_varianzas(data_real_tidy$BUN_mean)
+test_medias(data_real_tidy$BUN_mean)
+
+# ORINA ----------------------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = Urine_mean))
 
+test_varianzas(data_real_tidy$Urine_mean)
+test_medias(data_real_tidy$Urine_mean)
+
+# HEMATOCRITO ----------------------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = HCT_mean))
 
+test_varianzas(data_real_tidy$HCT_mean)
+test_medias(data_real_tidy$HCT_mean)
+
+# SERUM BICARBONADO ----------------------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = HCO3_mean))
 
+test_varianzas(data_real_tidy$HCO3_mean)
+test_medias(data_real_tidy$HCO3_mean)
+
+# PLAQUETAS ----------------------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = Platelets_mean))
 
+test_varianzas(data_real_tidy$Platelets_mean)
+test_medias(data_real_tidy$Platelets_mean)
+
+# GLOBULOS BLANCOS SANGRE ----------------------------------------------------------------------------------------
 data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = WBC_mean))
 
-
-# hip nula : varianzas iguales
-# hip alternativa : diferentes 
-var.test(data_real_tidy$HCT_mean[data_real_tidy$`In-hospital_death` == 0],
-         data_real_tidy$HCT_mean[data_real_tidy$`In-hospital_death` == 1])
-
-
-# hip nula : medias son iguales
-# hip alternativa: se indica en alternative = c("two.sided", "less", "greater")
-t.test(data_real_tidy$HCT_mean[data_real_tidy$`In-hospital_death`==0],
-       data_real_tidy$HCT_mean[data_real_tidy$`In-hospital_death`==1],
-       var.equal = TRUE)
+test_varianzas(data_real_tidy$WBC_mean)
+test_medias(data_real_tidy$WBC_mean)
 
 ```
 
