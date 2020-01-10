@@ -15,6 +15,7 @@ output:
 ```{r setup0, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,cache=TRUE)
 library("tidyverse")
+library("gridExtra")
 ```
 
 # Introducción: Physionet 2012 UCI data mortality
@@ -84,7 +85,7 @@ leer_paciente = function(file){read_csv(file, col_types = cols(Time = col_charac
 #leer_paciente(list_files[1])
 raw_data = lapply(list_files,leer_paciente) # lista de los datos por paciente
 
-#extraer perfiles "RecordID" "Age"      "Gender"   "Height"   "Weight"   "ICUType" 
+#extraer perfiles "RecordID" "Age"  "Gender"   "Height"   "Weight"   "ICUType" 
 perfil = function(data_paciente){
             data_paciente %>%
             filter(Parameter %in% c("RecordID","Age","Gender","Height","ICUType","Weight")) %>%
@@ -277,7 +278,7 @@ test_medias = function(columna){
     print('Rechazamos: Las medias son diferentes')
   }
   else{
-    print('Aceptamos: Las medias son iguales')
+    print('Aceptamos: Las medias son iguales <-')
   }
     
 }
@@ -288,80 +289,108 @@ test_medias = function(columna){
 data_real_tidy$`In-hospital_death` = factor(data_real_tidy$`In-hospital_death`, labels = c("0","1"))
 
 # LATIDO CORAZON -------------------------------------------------------------------------
-data_real_tidy %>%
+p1 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = HR_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = HR_mean)) +
+  labs(x = " vive | muere", y = "Latido corazon")
 
 
 # Basta hacer solo el test de medias ya que dentro de este saldra la solucion del test de varianzas.
+print("Variable: LATIDO CORAZÓN")
 test_medias(data_real_tidy$HR_mean)
 
 # TEMPERATURA ----------------------------------------------------------------------------
-data_real_tidy %>%
+p2 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = Temp_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = Temp_mean)) +
+  labs(x = " vive | muere", y = "Temperatura")
 
+print("Variable: TEMPERATURA")
 test_medias(data_real_tidy$Temp_mean)
 
 # GLASGOW --------------------------------------------------------------------------------
-data_real_tidy %>%
+p3 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = GCS_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = GCS_mean)) +
+  labs(x = " vive | muere", y = "Glasgow")
 
+print("Variable: GLASGOW")
 test_medias(data_real_tidy$GCS_mean)
 
 # CREATININA -----------------------------------------------------------------------------
-data_real_tidy %>%
+p4 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = Creatinine_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = Creatinine_mean)) +
+  labs(x = " vive | muere", y = "Creatinina")
 
+print("Variable: CREATININA")
 test_medias(data_real_tidy$Creatinine_mean)
 
 # NITROGENO EN SANGRE --------------------------------------------------------------------
-data_real_tidy %>%
+p5 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = BUN_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = BUN_mean)) +
+  labs(x = " vive | muere", y = "Ni en sangre")
 
+print("Variable: NITROGENO EN SANGRE")
 test_medias(data_real_tidy$BUN_mean)
 
 # ORINA ----------------------------------------------------------------------------------
-data_real_tidy %>%
+p6 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = Urine_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = Urine_mean)) +
+  labs(x = " vive | muere", y = "Orina")
 
+print("Variable: ORINA")
 test_medias(data_real_tidy$Urine_mean)
 
 # HEMATOCRITO ----------------------------------------------------------------------------
-data_real_tidy %>%
+p7 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = HCT_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = HCT_mean)) +
+  labs(x = " vive | muere", y = "Hematocrito")
 
+print("Variable: HEMATOCRITO")
 test_medias(data_real_tidy$HCT_mean) #Aqui aceptamos las medias, así HTC no nos interesa
 
 # SERUM BICARBONADO ----------------------------------------------------------------------
-data_real_tidy %>%
+p8 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = HCO3_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = HCO3_mean)) +
+  labs(x = " vive | muere", y = "Serum bicarbonado")
 
+print("Variable: SERUM BICARBONADO")
 test_medias(data_real_tidy$HCO3_mean)
 
 # PLAQUETAS ------------------------------------------------------------------------------
-data_real_tidy %>%
+p9 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = Platelets_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = Platelets_mean)) +
+  labs(x = " vive | muere", y = "Plaquetas")
 
+print("Variable: PLAQUETAS")
 test_medias(data_real_tidy$Platelets_mean) #Aceptamos las medias, así Platelets no nos interesa
 
 # GLOBULOS BLANCOS SANGRE ----------------------------------------------------------------
-data_real_tidy %>%
+p10 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = WBC_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = WBC_mean)) +
+  labs(x = " vive | muere", y = "Globulos blancos")
 
+print("Variable: GLOBULOS BLANCOS EN SANGRE")
 test_medias(data_real_tidy$WBC_mean)
+
+
+grid.arrange(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10, nrow = 2)
+
 
 ```
 
 Hemos descubierto que Platelets y HTC no vale la pena considerarlos. Falta elegir de entre los 8 restantes, cuales son los que presentan mayor varianza. Ésto se puede ver mejor en los boxplot.
+
+Lo que nos interesa ahora es coger de las que sí presentan diferencias, elegir las que el p-valor sea más bajo ya que serán aquellas que nos aportarán más información.
+
+
 
 
 ```
