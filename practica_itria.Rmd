@@ -16,6 +16,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE,cache=TRUE)
 library("tidyverse")
 library("gridExtra")
+library("tidyr")
 ```
 
 # Introducción: Physionet 2012 UCI data mortality
@@ -166,13 +167,13 @@ series_summary =  series_parameters %>%
 data_tidy = Scores_perfilesA %>% inner_join(series_summary)
 ```
 
-Elimino NA
+## LIMPIEZA NA's
 
 ```{r}
 aux=which(is.na(data_tidy$Lactate_count))
 length(aux)
 data_tidy2=data_tidy[-aux,]
-view(data_tidy2)
+#view(data_tidy2)
 ```
 
 Dejamos de considerar por demasiados NA's:
@@ -183,11 +184,13 @@ Dejamos de considerar por demasiados NA's:
 
 
 ```{r}
+#Definimos una función que nos cuente el número de NA's en una variable x
 contar_nas = function(x){
   sum(is.na(x))
   
 }
 
+#Definimos un programa que la variable x marque TRUE cuando tiene menos de 1500 NA's
 pocos_nas = function(x){
   for(i in 1:length(x)){
     if(contar_nas(x) >= 1500){
@@ -203,47 +206,50 @@ pocos_nas = function(x){
 
 #data_tidy3 = drop_na(data_tidy)
 
-
-primera_seleccion = data_tidy %>%
+#Aplicamos la función de TRUE o FALSE para saber qué variables pasan el umbral de 1500 NA's y cuáles no
+seleccion_pocos_nas = data_tidy %>%
   apply( 2, pocos_nas)
 
 
-# VARIABLES CON "POCOS NAS" EN LA VARIABLE COUNT
-nombres = names(primera_seleccion[primera_seleccion])
+# Guardamos sólo los nombres de las variables que en "<VARIABLE>_count" está por debajo los 1500 NA's
+nombres = names(seleccion_pocos_nas[seleccion_pocos_nas])
 nombres
 
-
+#Guardamos en un data set nuevo las variables que nos ha interesado seleccionar con el criterio de NA's
 primera_seleccion = select(data_tidy, nombres)
-View(primera_seleccion)
+primera_seleccion
+
 
 ```
 
+## SELECCIÓN 10 VARIABLES INICIALES
 
-Hacemos la selección de las 10 variables considerando aquellas que tienen menos NA's
+El criterio de primera selección se basará en considerar las que tengan menos NA's como las más útiles para nuestro estudio.
 
 ```{r}
 # DE LAS SELECCIONADAS, MIRAMOS LAS QUE TIENEN MENOS NA'S Y LAS REORDENAMOS PARA ELEGIR LAS 10 PRIMERAS
-pepe = select(primera_seleccion, ends_with("sd")) %>% apply(2, contar_nas)
+# Para hacerlo nos fijamos sólo en las variables: "<VARIABLE>_sd" mediante un select
+seleccion_menor_nas = select(primera_seleccion, ends_with("sd")) %>% apply(2, contar_nas)
+seleccion_menor_nas
 
-nombres_pocos_nas = sort(pepe)
+# LAS REORDENAMOS PARA PODER COGER SÓLO LAS 10 PRIMERAS
+nombres_pocos_nas = sort(seleccion_menor_nas)
 nombres_pocos_nas
 
+# COGEMOS LAS 10 PRIMERAS
 nombres_def = nombres_pocos_nas[1:10]
 nombres_def
 
-# SOLUCION CUTRE
-
+# DE FORMA MANUAL, VOLVEMOS AL DATA SET ORIGINAL Y SELECCIONAMOS LAS 10 VARIABLES DE "nombres_def"
 data_real_tidy = select(data_tidy, contains("RecordID"),  contains("Age"),  contains("Gender"),  contains("Height"),  contains("Weight"),  contains("ICUType"),  contains("SAPS-I"),  contains("SOFA"),  contains("Length_of_stay"),  contains("Survival"),  contains("In-hospital_death"), contains("HR"), contains("Temp"), contains("GCS"), contains("Creatinine"),  contains("BUN"),  contains("Urine"),  contains("HCT"),  contains("HCO3"),  contains("Platelets"),  contains("WBC"))
 
-
+# Eliminamos los na's que todavía hay y vemos que esta vez no desaparecen todos los datos, 
+# así pues habremos hecho una limpieza que habrá merecido la pena :)
 drop_na(data_real_tidy)
 
-
-#las que tengan mayores diferencias con las muertes de los in hospital death
-
-#comparaciones con un t.test, per saber si ses mitjanes son iguales o no, si soln iguales FUERA
 ```
 
+## SELECCIÓN 5 VARIABLES
 
 Para elegir las 5 que nos aporten mas información a la hora de predecir las muertes, realizamos los siguientes boxplots y contrastes de hipótesis para encontrar aquellas que la muerte y la vida tengan más variación.
 
@@ -257,11 +263,9 @@ test_varianzas = function(columna){
                columna[data_real_tidy$`In-hospital_death` == 1])
   alpha = x$p.value
   if(alpha < 0.05){
-    print('Rechazamos: Las varianzas son diferentes')
     return(FALSE)
   }
   else{
-    print('Aceptamos: Las varianzas son iguales')
     return(TRUE)
   }
 }
@@ -273,6 +277,13 @@ test_medias = function(columna){
   x = t.test(columna[data_real_tidy$`In-hospital_death` == 0],
              columna[data_real_tidy$`In-hospital_death` == 1],
              var.equal = test_varianzas(columna)) # Aquí aplicamos la función anterior como habíamos dicho
+  return(x$p.value)
+}
+
+respuesta_test = function(columna){
+  x = t.test(columna[data_real_tidy$`In-hospital_death` == 0],
+             columna[data_real_tidy$`In-hospital_death` == 1],
+             var.equal = test_varianzas(columna)) # Aplicamos la función anterior para considerar o no var. iguales o diferentes
   alpha = x$p.value
   if(alpha < 0.05){
     print('Rechazamos: Las medias son diferentes')
@@ -280,13 +291,13 @@ test_medias = function(columna){
   else{
     print('Aceptamos: Las medias son iguales <-')
   }
-    
 }
 
 
 # SELECCIÓN 5 VARIABLES MÁS RELEVANTES PARA PREDECIR LA MUERTE
 
 data_real_tidy$`In-hospital_death` = factor(data_real_tidy$`In-hospital_death`, labels = c("0","1"))
+p_valores = c(1:10)
 
 # LATIDO CORAZON -------------------------------------------------------------------------
 p1 <- data_real_tidy %>%
@@ -295,9 +306,12 @@ p1 <- data_real_tidy %>%
   labs(x = " vive | muere", y = "Latido corazon")
 
 
-# Basta hacer solo el test de medias ya que dentro de este saldra la solucion del test de varianzas.
+# Hacemos el test de medias de cada una de las variables
 print("Variable: LATIDO CORAZÓN")
-test_medias(data_real_tidy$HR_mean)
+# Guardamos el p_valor para más tarde considerar las 5 mejores como aquellas con el p_valor más bajo
+p_valores[1] = test_medias(data_real_tidy$HR_mean)
+# Imprimimos por pantalla la resolución del test de medias (teniendo el de varianzas ya resuelto dentro del de medias)
+respuesta_test(data_real_tidy$HR_mean)
 
 # TEMPERATURA ----------------------------------------------------------------------------
 p2 <- data_real_tidy %>%
@@ -306,7 +320,8 @@ p2 <- data_real_tidy %>%
   labs(x = " vive | muere", y = "Temperatura")
 
 print("Variable: TEMPERATURA")
-test_medias(data_real_tidy$Temp_mean)
+p_valores[2] = test_medias(data_real_tidy$Temp_mean)
+respuesta_test(data_real_tidy$Temp_mean)
 
 # GLASGOW --------------------------------------------------------------------------------
 p3 <- data_real_tidy %>%
@@ -315,7 +330,8 @@ p3 <- data_real_tidy %>%
   labs(x = " vive | muere", y = "Glasgow")
 
 print("Variable: GLASGOW")
-test_medias(data_real_tidy$GCS_mean)
+p_valores[3] = test_medias(data_real_tidy$GCS_mean)
+respuesta_test(data_real_tidy$GCS_mean)
 
 # CREATININA -----------------------------------------------------------------------------
 p4 <- data_real_tidy %>%
@@ -324,7 +340,8 @@ p4 <- data_real_tidy %>%
   labs(x = " vive | muere", y = "Creatinina")
 
 print("Variable: CREATININA")
-test_medias(data_real_tidy$Creatinine_mean)
+p_valores[4] = test_medias(data_real_tidy$Creatinine_mean)
+respuesta_test(data_real_tidy$Creatinine_mean)
 
 # NITROGENO EN SANGRE --------------------------------------------------------------------
 p5 <- data_real_tidy %>%
@@ -333,7 +350,8 @@ p5 <- data_real_tidy %>%
   labs(x = " vive | muere", y = "Ni en sangre")
 
 print("Variable: NITROGENO EN SANGRE")
-test_medias(data_real_tidy$BUN_mean)
+p_valores[5] = test_medias(data_real_tidy$BUN_mean)
+respuesta_test(data_real_tidy$BUN_mean)
 
 # ORINA ----------------------------------------------------------------------------------
 p6 <- data_real_tidy %>%
@@ -342,7 +360,8 @@ p6 <- data_real_tidy %>%
   labs(x = " vive | muere", y = "Orina")
 
 print("Variable: ORINA")
-test_medias(data_real_tidy$Urine_mean)
+p_valores[6] = test_medias(data_real_tidy$Urine_mean)
+respuesta_test(data_real_tidy$Urine_mean)
 
 # HEMATOCRITO ----------------------------------------------------------------------------
 p7 <- data_real_tidy %>%
@@ -351,7 +370,8 @@ p7 <- data_real_tidy %>%
   labs(x = " vive | muere", y = "Hematocrito")
 
 print("Variable: HEMATOCRITO")
-test_medias(data_real_tidy$HCT_mean) #Aqui aceptamos las medias, así HTC no nos interesa
+p_valores[7] = test_medias(data_real_tidy$HCT_mean) # Se acepta que las medias son iguales, así HTC no nos interesa
+respuesta_test(data_real_tidy$HCT_mean)
 
 # SERUM BICARBONADO ----------------------------------------------------------------------
 p8 <- data_real_tidy %>%
@@ -360,7 +380,8 @@ p8 <- data_real_tidy %>%
   labs(x = " vive | muere", y = "Serum bicarbonado")
 
 print("Variable: SERUM BICARBONADO")
-test_medias(data_real_tidy$HCO3_mean)
+p_valores[8] = test_medias(data_real_tidy$HCO3_mean)
+respuesta_test(data_real_tidy$HCO3_mean)
 
 # PLAQUETAS ------------------------------------------------------------------------------
 p9 <- data_real_tidy %>%
@@ -369,7 +390,8 @@ p9 <- data_real_tidy %>%
   labs(x = " vive | muere", y = "Plaquetas")
 
 print("Variable: PLAQUETAS")
-test_medias(data_real_tidy$Platelets_mean) #Aceptamos las medias, así Platelets no nos interesa
+p_valores[9] = test_medias(data_real_tidy$Platelets_mean) 
+respuesta_test(data_real_tidy$Platelets_mean) # Se acepta que las medias son iguales, así Platelets no nos interesa
 
 # GLOBULOS BLANCOS SANGRE ----------------------------------------------------------------
 p10 <- data_real_tidy %>%
@@ -378,11 +400,11 @@ p10 <- data_real_tidy %>%
   labs(x = " vive | muere", y = "Globulos blancos")
 
 print("Variable: GLOBULOS BLANCOS EN SANGRE")
-test_medias(data_real_tidy$WBC_mean)
+p_valores[10] = test_medias(data_real_tidy$WBC_mean)
+respuesta_test(data_real_tidy$WBC_mean)
 
 
 grid.arrange(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10, nrow = 2)
-
 
 ```
 
@@ -390,12 +412,37 @@ Hemos descubierto que Platelets y HTC no vale la pena considerarlos. Falta elegi
 
 Lo que nos interesa ahora es coger de las que sí presentan diferencias, elegir las que el p-valor sea más bajo ya que serán aquellas que nos aportarán más información.
 
+```{r}
+# Creamos un array que nos guarde los nombres de las 10 variables con las que trabajamos
+diez_variables = names(select(data_real_tidy, ends_with("mean")))
 
+# Creamos una tibble que de cada variable nos diga su p-valor en el contraste de medias
+tabla_p_valores = as_tibble(data.frame(diez_variables, p_valores))
+tabla_p_valores
+
+
+# Las reordenamos de menor a mayor para quedarnos sólo con las 5 primeras (con el p-valor más bajo)
+cinco_variables = arrange(tabla_p_valores,p_valores)[1:5,1]
+cinco_variables
+```
+
+Ahora que ya sabemos los nombres de las 5 variables que nos ayudarán a hacer un estudio más preciso, creamos la tabla final de datos sólo con estas variables.
+
+```{r}
+# Selecionamos manualmente (como antes) las 5 variables que usaremos durante lo que queda de trabajo
+data_real_tidy = select(data_tidy, contains("RecordID"),  contains("Age"),  contains("Gender"),  contains("Height"),  contains("Weight"),  contains("ICUType"),  contains("SAPS-I"),  contains("SOFA"),  contains("Length_of_stay"),  contains("Survival"),  contains("In-hospital_death"), contains("GCS"), contains("BUN"),  contains("Urine"), contains("HCO3"), contains("Creatinine"))
+
+# Mostramos por pantalla la tabla final
+data_real_tidy
+```
 
 
 ```
 hola= series_parameters %>% spread(Parameter,Value)
 import=c()
 chart.Correlation(hola[], histogram=TRUE, pch=19)
+
+hola = tabla_p_valores %>%
+spread(key = diez_variables, value = p_valores)
 ```
 
