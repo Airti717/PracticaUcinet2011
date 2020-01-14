@@ -10,7 +10,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Ricardo Alberich, Irene Garcia" />
+<meta name="author" content="Arturo González, Jun De Wu, Ítria Mascaró" />
 
 
 <title>Carga inicial datos: Physionet 2012 UCI data mortality</title>
@@ -372,7 +372,7 @@ summary {
 
 
 <h1 class="title toc-ignore">Carga inicial datos: Physionet 2012 UCI data mortality</h1>
-<h4 class="author">Ricardo Alberich, Irene Garcia</h4>
+<h4 class="author">Arturo González, Jun De Wu, Ítria Mascaró</h4>
 
 </div>
 
@@ -463,7 +463,7 @@ perfiles =  lapply(raw_data,perfil) %&gt;%
             bind_rows() %&gt;%
             select(RecordID, Age, Gender, Height,Weight,ICUType)
 
-glimpse(perfiles)</code></pre>
+glimpse(perfiles) # Printamos la funcion</code></pre>
 <pre><code>## Observations: 4,000
 ## Variables: 6
 ## $ RecordID &lt;dbl&gt; 132539, 132540, 132541, 132543, 132545, 132547, 13254...
@@ -472,13 +472,11 @@ glimpse(perfiles)</code></pre>
 ## $ Height   &lt;dbl&gt; -1.0, 175.3, -1.0, 180.3, -1.0, 180.3, 162.6, 162.6, ...
 ## $ Weight   &lt;dbl&gt; -1.0, 76.0, 56.7, 84.6, -1.0, 114.0, 87.0, 48.4, 60.7...
 ## $ ICUType  &lt;dbl&gt; 4, 2, 3, 3, 3, 1, 3, 3, 3, 2, 3, 2, 3, 1, 1, 2, 3, 3,...</code></pre>
-<pre class="r"><code>## Ler series
-## se modifica error de time
-
+<pre class="r"><code># Arreglamos el error de time
 serie_UCI_parameter &lt;- function(paciente,parameters){ paciente %&gt;%
                                                       arrange(Parameter,Time_Minutes) %&gt;%
                                                       filter(Parameter %in% parameters) %&gt;%
-                                                      add_column(RecordID=paciente[1,3]$Value) } 
+                                                      add_column(RecordID = paciente[1,3]$Value) } 
 ##ejemplo
 parameters = c(&quot;HR&quot;,&quot;RespRate&quot;,&quot;GCS&quot;)
 serie_paciente1 = serie_UCI_parameter(raw_data[[1]],parameters)
@@ -501,7 +499,8 @@ serie_paciente1</code></pre>
 parameters=c(&quot;Albumin&quot;,&quot;ALP&quot;,&quot;ALT&quot;,&quot;AST&quot;,&quot;Bilirubin&quot;,&quot;BUN&quot;,&quot;Cholesterol&quot;,&quot;Creatinine&quot;,&quot;DiasABP&quot;,&quot;FiO2&quot;,&quot;GCS&quot;,&quot;Glucose&quot;,&quot;HCO3&quot;,&quot;HCT&quot;,&quot;HR&quot;,&quot;K&quot;,&quot;Lactate&quot;,&quot;Mg&quot;,&quot;MAP&quot;,&quot;MechVent&quot;,&quot;Na&quot;,&quot;NIDiasABP&quot;,&quot;NIMAP&quot;,&quot;NISysABP&quot;,&quot;PaCO2&quot;,&quot;PaO2&quot;,&quot;pH&quot;,&quot;Platelets&quot;,&quot;RespRate&quot;,&quot;SaO2&quot;,&quot;SysABP&quot;,&quot;Temp&quot;,&quot;TropI&quot;,&quot;TropT&quot;,&quot;Urine&quot;,&quot;WBC&quot;)
 series_parameters = lapply(raw_data,FUN=function(x) serie_UCI_parameter(x,parameters)) %&gt;%
                     bind_rows()
-glimpse(series_parameters)</code></pre>
+
+glimpse(series_parameters) # Printamos la función</code></pre>
 <pre><code>## Observations: 1,606,254
 ## Variables: 4
 ## $ Time_Minutes &lt;dbl&gt; 637, 1987, 637, 1987, 7, 217, 457, 697, 937, 1177...
@@ -648,44 +647,7 @@ nombres</code></pre>
 ## [82] &quot;Urine_mean&quot;        &quot;Urine_sd&quot;          &quot;WBC_count&quot;        
 ## [85] &quot;WBC_mean&quot;          &quot;WBC_sd&quot;</code></pre>
 <pre class="r"><code>#Guardamos en un data set nuevo las variables que nos ha interesado seleccionar con el criterio de NA&#39;s
-primera_seleccion = select(data_tidy, nombres)
-primera_seleccion</code></pre>
-<pre><code>## # A tibble: 3,997 x 86
-##    RecordID   Age Gender Height Weight ICUType `SAPS-I`  SOFA
-##       &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;   &lt;dbl&gt;    &lt;dbl&gt; &lt;dbl&gt;
-##  1   132539    54      0    -1    -1         4        6     1
-##  2   132540    76      1   175.   76         2       16     8
-##  3   132541    44      0    -1    56.7       3       21    11
-##  4   132543    68      1   180.   84.6       3        7     1
-##  5   132545    88      0    -1    -1         3       17     2
-##  6   132547    64      1   180.  114         1       14    11
-##  7   132548    68      0   163.   87         3       14     4
-##  8   132551    78      0   163.   48.4       3       19     8
-##  9   132554    64      0    -1    60.7       3       11     0
-## 10   132555    74      1   175.   66.1       2       14     6
-## # ... with 3,987 more rows, and 78 more variables: Length_of_stay &lt;dbl&gt;,
-## #   Survival &lt;dbl&gt;, `In-hospital_death` &lt;dbl&gt;, BUN_count &lt;dbl&gt;,
-## #   BUN_mean &lt;dbl&gt;, BUN_sd &lt;dbl&gt;, Creatinine_count &lt;dbl&gt;,
-## #   Creatinine_mean &lt;dbl&gt;, Creatinine_sd &lt;dbl&gt;, DiasABP_count &lt;dbl&gt;,
-## #   DiasABP_mean &lt;dbl&gt;, DiasABP_sd &lt;dbl&gt;, FiO2_count &lt;dbl&gt;,
-## #   FiO2_mean &lt;dbl&gt;, FiO2_sd &lt;dbl&gt;, GCS_count &lt;dbl&gt;, GCS_mean &lt;dbl&gt;,
-## #   GCS_sd &lt;dbl&gt;, Glucose_count &lt;dbl&gt;, Glucose_mean &lt;dbl&gt;,
-## #   Glucose_sd &lt;dbl&gt;, HCO3_count &lt;dbl&gt;, HCO3_mean &lt;dbl&gt;, HCO3_sd &lt;dbl&gt;,
-## #   HCT_count &lt;dbl&gt;, HCT_mean &lt;dbl&gt;, HCT_sd &lt;dbl&gt;, HR_count &lt;dbl&gt;,
-## #   HR_mean &lt;dbl&gt;, HR_sd &lt;dbl&gt;, K_count &lt;dbl&gt;, K_mean &lt;dbl&gt;, K_sd &lt;dbl&gt;,
-## #   MAP_count &lt;dbl&gt;, MAP_mean &lt;dbl&gt;, MAP_sd &lt;dbl&gt;, MechVent_count &lt;dbl&gt;,
-## #   MechVent_mean &lt;dbl&gt;, MechVent_sd &lt;dbl&gt;, Mg_count &lt;dbl&gt;, Mg_mean &lt;dbl&gt;,
-## #   Mg_sd &lt;dbl&gt;, Na_count &lt;dbl&gt;, Na_mean &lt;dbl&gt;, Na_sd &lt;dbl&gt;,
-## #   NIDiasABP_count &lt;dbl&gt;, NIDiasABP_mean &lt;dbl&gt;, NIDiasABP_sd &lt;dbl&gt;,
-## #   NIMAP_count &lt;dbl&gt;, NIMAP_mean &lt;dbl&gt;, NIMAP_sd &lt;dbl&gt;,
-## #   NISysABP_count &lt;dbl&gt;, NISysABP_mean &lt;dbl&gt;, NISysABP_sd &lt;dbl&gt;,
-## #   PaCO2_count &lt;dbl&gt;, PaCO2_mean &lt;dbl&gt;, PaCO2_sd &lt;dbl&gt;, PaO2_count &lt;dbl&gt;,
-## #   PaO2_mean &lt;dbl&gt;, PaO2_sd &lt;dbl&gt;, pH_count &lt;dbl&gt;, pH_mean &lt;dbl&gt;,
-## #   pH_sd &lt;dbl&gt;, Platelets_count &lt;dbl&gt;, Platelets_mean &lt;dbl&gt;,
-## #   Platelets_sd &lt;dbl&gt;, SysABP_count &lt;dbl&gt;, SysABP_mean &lt;dbl&gt;,
-## #   SysABP_sd &lt;dbl&gt;, Temp_count &lt;dbl&gt;, Temp_mean &lt;dbl&gt;, Temp_sd &lt;dbl&gt;,
-## #   Urine_count &lt;dbl&gt;, Urine_mean &lt;dbl&gt;, Urine_sd &lt;dbl&gt;, WBC_count &lt;dbl&gt;,
-## #   WBC_mean &lt;dbl&gt;, WBC_sd &lt;dbl&gt;</code></pre>
+primera_seleccion = select(data_tidy, nombres)</code></pre>
 </div>
 <div id="selección-10-variables-iniciales" class="section level2">
 <h2><span class="header-section-number">2.6</span> SELECCIÓN 10 VARIABLES INICIALES</h2>
@@ -960,8 +922,8 @@ data_real_tidy = select(data_tidy, contains(&quot;RecordID&quot;),  contains(&qu
 head(data_real_tidy) %&gt;%
   kable() %&gt;%
   kable_styling(bootstrap_options = c(&quot;striped&quot;, &quot;hover&quot;, &quot;condensed&quot;)) %&gt;%
-  scroll_box(width = &quot;900px&quot;)</code></pre>
-<div style="border: 1px solid #ddd; padding: 5px; overflow-x: scroll; width:900px; ">
+  scroll_box(width = &quot;910px&quot;)</code></pre>
+<div style="border: 1px solid #ddd; padding: 5px; overflow-x: scroll; width:910px; ">
 <table class="table table-striped table-hover table-condensed" style="margin-left: auto; margin-right: auto;">
 <thead>
 <tr>
@@ -1529,12 +1491,6 @@ Creatinine_sd
 </tbody>
 </table>
 </div>
-<pre><code>hola= series_parameters %&gt;% spread(Parameter,Value)
-import=c()
-chart.Correlation(hola[], histogram=TRUE, pch=19)
-
-hola = tabla_p_valores %&gt;%
-spread(key = diez_variables, value = p_valores)</code></pre>
 </div>
 </div>
 

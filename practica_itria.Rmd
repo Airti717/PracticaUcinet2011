@@ -1,6 +1,6 @@
 ---
 title: "Carga inicial datos: Physionet 2012 UCI data mortality"
-author: "Ricardo Alberich, Irene Garcia"
+author: "Arturo González, Jun De Wu, Ítria Mascaró"
 time:  "`Sys.Date()`"
 output: 
   html_document: 
@@ -12,7 +12,7 @@ output:
     toc: yes
 ---
 
-```{r setup0, include=FALSE}
+```{r setup0, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE,cache=TRUE)
 library("tidyverse")
 library("gridExtra")
@@ -102,14 +102,13 @@ perfiles =  lapply(raw_data,perfil) %>%
             bind_rows() %>%
             select(RecordID, Age, Gender, Height,Weight,ICUType)
 
-glimpse(perfiles)
-## Ler series
-## se modifica error de time
+glimpse(perfiles) # Printamos la funcion
 
+# Arreglamos el error de time
 serie_UCI_parameter <- function(paciente,parameters){ paciente %>%
                                                       arrange(Parameter,Time_Minutes) %>%
                                                       filter(Parameter %in% parameters) %>%
-                                                      add_column(RecordID=paciente[1,3]$Value) } 
+                                                      add_column(RecordID = paciente[1,3]$Value) } 
 ##ejemplo
 parameters = c("HR","RespRate","GCS")
 serie_paciente1 = serie_UCI_parameter(raw_data[[1]],parameters)
@@ -118,7 +117,8 @@ serie_paciente1
 parameters=c("Albumin","ALP","ALT","AST","Bilirubin","BUN","Cholesterol","Creatinine","DiasABP","FiO2","GCS","Glucose","HCO3","HCT","HR","K","Lactate","Mg","MAP","MechVent","Na","NIDiasABP","NIMAP","NISysABP","PaCO2","PaO2","pH","Platelets","RespRate","SaO2","SysABP","Temp","TropI","TropT","Urine","WBC")
 series_parameters = lapply(raw_data,FUN=function(x) serie_UCI_parameter(x,parameters)) %>%
                     bind_rows()
-glimpse(series_parameters)
+
+glimpse(series_parameters) # Printamos la función
 ```
 
 
@@ -217,7 +217,6 @@ nombres
 
 #Guardamos en un data set nuevo las variables que nos ha interesado seleccionar con el criterio de NA's
 primera_seleccion = select(data_tidy, nombres)
-primera_seleccion
 
 ```
 
@@ -436,17 +435,9 @@ data_real_tidy = select(data_tidy, contains("RecordID"),  contains("Age"),  cont
 head(data_real_tidy) %>%
   kable() %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
-  scroll_box(width = "900px")
+  scroll_box(width = "910px")
 
 ```
 
 
-```
-hola= series_parameters %>% spread(Parameter,Value)
-import=c()
-chart.Correlation(hola[], histogram=TRUE, pch=19)
-
-hola = tabla_p_valores %>%
-spread(key = diez_variables, value = p_valores)
-```
 
