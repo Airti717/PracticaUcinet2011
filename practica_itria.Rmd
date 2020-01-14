@@ -3,11 +3,11 @@ title: "Carga inicial datos: Physionet 2012 UCI data mortality"
 author: "Ricardo Alberich, Irene Garcia"
 time:  "`Sys.Date()`"
 output: 
-  pdf_document: 
-    number_sections: yes
-    toc: yes
   html_document: 
     keep_md: yes
+    number_sections: yes
+    toc: yes
+  pdf_document: 
     number_sections: yes
     toc: yes
 ---
@@ -17,6 +17,8 @@ knitr::opts_chunk$set(echo = TRUE,cache=TRUE)
 library("tidyverse")
 library("gridExtra")
 library("tidyr")
+library("knitr")
+library("kableExtra")
 ```
 
 # Introducción: Physionet 2012 UCI data mortality
@@ -217,7 +219,6 @@ nombres
 primera_seleccion = select(data_tidy, nombres)
 primera_seleccion
 
-
 ```
 
 ## SELECCIÓN 10 VARIABLES INICIALES
@@ -251,7 +252,7 @@ drop_na(data_real_tidy)
 
 Para elegir las 5 que nos aporten mas información a la hora de predecir las muertes, realizamos los siguientes boxplots y contrastes de hipótesis para encontrar aquellas que la muerte y la vida tengan más variación.
 
-```{r}
+```{r, warning = FALSE}
 # Hacemos contraste de hipótesis para saber si deberiamos considerar las
 # varianzas iguales o diferentes para el contraste de medias que haremos a continuación.
 test_varianzas = function(columna){
@@ -432,7 +433,11 @@ Ahora que ya sabemos los nombres de las 5 variables que nos ayudarán a hacer un
 data_real_tidy = select(data_tidy, contains("RecordID"),  contains("Age"),  contains("Gender"),  contains("Height"),  contains("Weight"),  contains("ICUType"),  contains("SAPS-I"),  contains("SOFA"),  contains("Length_of_stay"),  contains("Survival"),  contains("In-hospital_death"), contains("GCS"), contains("BUN"),  contains("Urine"), contains("HCO3"), contains("Creatinine"))
 
 # Mostramos por pantalla la tabla final
-data_real_tidy
+head(data_real_tidy) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+  scroll_box(width = "900px")
+
 ```
 
 
