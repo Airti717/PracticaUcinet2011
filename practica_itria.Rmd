@@ -170,9 +170,9 @@ data_tidy = Scores_perfilesA %>% inner_join(series_summary)
 ## LIMPIEZA NA's
 
 ```{r}
-aux=which(is.na(data_tidy$Lactate_count))
+aux = which(is.na(data_tidy$Lactate_count))
 length(aux)
-data_tidy2=data_tidy[-aux,]
+data_tidy2 = data_tidy[-aux,]
 #view(data_tidy2)
 ```
 
@@ -187,7 +187,6 @@ Dejamos de considerar por demasiados NA's:
 #Definimos una función que nos cuente el número de NA's en una variable x
 contar_nas = function(x){
   sum(is.na(x))
-  
 }
 
 #Definimos un programa que la variable x marque TRUE cuando tiene menos de 1500 NA's
@@ -200,7 +199,6 @@ pocos_nas = function(x){
       return(TRUE)
     }
   }
-  
 }
 
 
@@ -295,8 +293,9 @@ respuesta_test = function(columna){
 
 
 # SELECCIÓN 5 VARIABLES MÁS RELEVANTES PARA PREDECIR LA MUERTE
-
+# Para que podamos hacer los boxplot bien, antes debemos hacer factor la columna de "Muertes en el hospital"
 data_real_tidy$`In-hospital_death` = factor(data_real_tidy$`In-hospital_death`, labels = c("0","1"))
+# Creamos un array "vacio" que contendrá los valores del p.value del test de medias
 p_valores = c(1:10)
 
 # LATIDO CORAZON -------------------------------------------------------------------------
@@ -403,7 +402,7 @@ print("Variable: GLOBULOS BLANCOS EN SANGRE")
 p_valores[10] = test_medias(data_real_tidy$WBC_mean)
 respuesta_test(data_real_tidy$WBC_mean)
 
-
+# Imprimimos los boxplot de forma más compacta para ahorrar espacio
 grid.arrange(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10, nrow = 2)
 
 ```
