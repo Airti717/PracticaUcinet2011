@@ -17,8 +17,17 @@ knitr::opts_chunk$set(echo = TRUE,cache=TRUE)
 library("tidyverse")
 library("gridExtra")
 library("tidyr")
+
+# Para la impresión de tablas
 library("knitr")
-library("kableExtra")
+library("kableExtra") 
+
+# Para el anállisis descriptivo multivariado
+library("GGally")
+library("PerformanceAnalytics")
+library("ggcorrplot")
+library("aplpack")
+
 ```
 
 # Introducción: Physionet 2012 UCI data mortality
@@ -460,13 +469,30 @@ head(data_real_tidy) %>%
 
 - `GCS` (Glasgow): 
 
-- `BUN` (Nitrogeno en sangre):
+- `BUN` (Nitrógeno en sangre):
 
 - `HCO3` (Serum bicarbonado):
 
 - `Creatinine` (Creatinina):
 
 - `Urine` (orina):
+
+
+
+
+# Análisis descriptivo multivariado
+
+
+
+```{r}
+path="http://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.data"
+wine=read.table(path,sep=",")
+impor=c(2:7,11:14)
+ggpairs(wine[,impor]) # primer gráfico a continuación
+chart.Correlation(wine[impor], histogram=TRUE, pch=19)
+```
+
+
 
 
 
