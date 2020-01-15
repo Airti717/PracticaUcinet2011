@@ -11,3 +11,9 @@ forcats
 gridExtra
 knitr
 kableExtra
+GGally
+zoo
+xts
+PerformanceAnalytics
+ggcorrplot
+aplpack

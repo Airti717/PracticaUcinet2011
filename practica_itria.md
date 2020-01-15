@@ -62,6 +62,23 @@ lista_pacientes_set_a[1]
 ```
 ## [1] "132539.txt"
 ```
+## Descripción de las variables
+
+- `Edad`
+
+- `Género`
+
+- `Tipo UCI`
+
+- `SAPSI`
+
+- `SOFA`
+
+- `LOS`
+
+- `Survival`
+
+- `In-hospital-death`
 
 
 ```
@@ -1032,6 +1049,44 @@ head(data_real_tidy) %>%
   </tr>
 </tbody>
 </table></div>
+
+## Descripción de las cinco variables seleccionadas
+
+- `GCS` (Glasgow): 
+
+- `BUN` (Nitrógeno en sangre):
+
+- `HCO3` (Serum bicarbonado):
+
+- `Creatinine` (Creatinina):
+
+- `Urine` (orina):
+
+
+
+
+# Análisis descriptivo multivariado
+
+
+
+
+```r
+# Para mayor facilidad en el calculo de correlacion
+mean_real_tidy = select(data_real_tidy,-RecordID, -ends_with("count"), -ends_with("sd"))
+sd_real_tidy = select(data_real_tidy,-RecordID, -ends_with("count"), -ends_with("mean"))
+
+chart.Correlation(mean_real_tidy, histogram=TRUE, pch=19)
+```
+
+![](practica_itria_files/figure-html/unnamed-chunk-13-1.png)<!-- -->
+
+```r
+chart.Correlation(sd_real_tidy, histogram=TRUE, pch=19)
+```
+
+![](practica_itria_files/figure-html/unnamed-chunk-13-2.png)<!-- -->
+
+
 
 
 
