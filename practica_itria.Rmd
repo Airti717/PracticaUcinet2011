@@ -28,6 +28,7 @@ library("PerformanceAnalytics")
 library("ggcorrplot")
 library("aplpack")
 
+library("MASS")
 ```
 
 # Introducción: Physionet 2012 UCI data mortality
@@ -270,7 +271,6 @@ data_real_tidy = select(data_tidy, contains("RecordID"),  contains("Age"),  cont
 # Eliminamos los na's que todavía hay y vemos que esta vez no desaparecen todos los datos, 
 # así pues habremos hecho una limpieza que habrá merecido la pena :)
 drop_na(data_real_tidy)
-
 ```
 
 ## SELECCIÓN 5 VARIABLES
@@ -457,6 +457,10 @@ Ahora que ya sabemos los nombres de las 5 variables que nos ayudarán a hacer un
 # Selecionamos manualmente (como antes) las 5 variables que usaremos durante lo que queda de trabajo
 data_real_tidy = select(data_tidy, contains("RecordID"),  contains("Age"),  contains("Gender"),  contains("Height"),  contains("Weight"),  contains("ICUType"),  contains("SAPS-I"),  contains("SOFA"),  contains("Length_of_stay"),  contains("Survival"),  contains("In-hospital_death"), contains("GCS"), contains("BUN"),  contains("Urine"), contains("HCO3"), contains("Creatinine"))
 
+data_real_tidy = drop_na(data_real_tidy)
+
+
+
 # Mostramos por pantalla la tabla final
 head(data_real_tidy) %>%
   kable() %>%
@@ -484,12 +488,29 @@ head(data_real_tidy) %>%
 
 
 
-```{r}
-path="http://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.data"
-wine=read.table(path,sep=",")
-impor=c(2:7,11:14)
-ggpairs(wine[,impor]) # primer gráfico a continuación
-chart.Correlation(wine[impor], histogram=TRUE, pch=19)
+```{r, fig.width=10, fig.height=6}
+
+n = nrow(data_real_tidy)
+
+data_cualitativa = select(data_real_tidy, Gender, ICUType, `In-hospital_death`)
+mosaic(data_cualitativa)
+data_cuantitativa = select(data_real_tidy, -RecordID, -Gender, -ICUType, -`In-hospital_death`)
+
+# Para mayor facilidad en el calculo de correlacion
+mean_real_tidy = select(data_cuantitativa, -ends_with("count"), -ends_with("sd"))
+sd_real_tidy = select(data_cualitativa, -ends_with("count"), -ends_with("mean"))
+
+
+chart.Correlation(mean_real_tidy, histogram=TRUE, pch=19)
+chart.Correlation(sd_real_tidy, histogram=TRUE, pch=19)
+
+sapply(mean_real_tidy, function(x) sum(is.na(x)))
+
+l = apply(mean_real_tidy,2,var)
+l
+
+Wt = t(mean_real_tidy)-colMeans(mean_real_tidy)
+Wt %*% t(Wt)/(n-1)
 ```
 
 
