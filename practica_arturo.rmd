@@ -169,7 +169,7 @@ data_tidy = Scores_perfilesA %>% inner_join(series_summary)
 
 Elimino NA
 
-```{r}
+```
 aux=which(is.na(data_tidy$Lactate_count))
 length(aux)
 data_tidy2=data_tidy[-aux,]
