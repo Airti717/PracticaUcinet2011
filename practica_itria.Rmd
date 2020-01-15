@@ -58,6 +58,23 @@ length(lista_pacientes_set_a) # número pacientes en training
 lista_pacientes_set_a[1]
 
 ```
+## Descripción de las variables
+
+- `Edad`
+
+- `Género`
+
+- `Tipo UCI`
+
+- `SAPSI`
+
+- `SOFA`
+
+- `LOS`
+
+- `Survival`
+
+- `In-hospital-death`
 
 
 ```
@@ -438,6 +455,18 @@ head(data_real_tidy) %>%
   scroll_box(width = "910px")
 
 ```
+
+## Descripción de las cinco variables seleccionadas
+
+- `GCS` (Glasgow): 
+
+- `BUN` (Nitrogeno en sangre):
+
+- `HCO3` (Serum bicarbonado):
+
+- `Creatinine` (Creatinina):
+
+- `Urine` (orina):
 
 
 
