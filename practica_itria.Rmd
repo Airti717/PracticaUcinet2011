@@ -28,7 +28,9 @@ library("PerformanceAnalytics")
 library("ggcorrplot")
 library("aplpack")
 
-library("MASS")
+# Para el ACP
+library("factoextra")
+library("ggfortify")
 ```
 
 # Introducción: Physionet 2012 UCI data mortality
@@ -76,9 +78,9 @@ lista_pacientes_set_a[1]
 
 - `Tipo UCI`
 
-- `SAPSI`
+- `SAPSI` ("Simplified Acute Physiology Score" estima la probabilitat de mortalitat del pacient d'UCI.)
 
-- `SOFA`
+- `SOFA` ("Sequential Organ Failure Assessment"  Es utilizado para seguir el estado del paciente durante su estadía en la Unidad de UC.)
 
 - `LOS`
 
@@ -483,37 +485,220 @@ head(data_real_tidy) %>%
 
 
 
-
 # Análisis descriptivo multivariado
 
+## Histogramas entre las variables cualitativas
 
+
+
+## ¿Qué variables influyen más mortalidad?
+
+
+
+## ¿El tipo de UCI marca muchas diferencias respecto el nivel de mortalidad?
+
+
+
+## Correlación entre variables
+
+Empezamos realizando un análisis estadístico multivariante sin separar las variables por tipo de UCI. Las conclusiones que podamos sacar estarán más generalizadas respecto al estudio individual.
+
+A la hora de calcular las correlaciones entre las variables por ejemplo, al variar entre los diferentes tipos de UCI's, los coeficientes de correlación variarán pero no cambiará respecto a qué variables están correlacionadas entre ellas.
 
 ```{r, fig.width=10, fig.height=6}
 
-n = nrow(data_real_tidy)
-
 data_cualitativa = select(data_real_tidy, Gender, ICUType, `In-hospital_death`)
-mosaic(data_cualitativa)
 data_cuantitativa = select(data_real_tidy, -RecordID, -Gender, -ICUType, -`In-hospital_death`)
+
 
 # Para mayor facilidad en el calculo de correlacion
 mean_real_tidy = select(data_cuantitativa, -ends_with("count"), -ends_with("sd"))
-sd_real_tidy = select(data_cualitativa, -ends_with("count"), -ends_with("mean"))
+#sd_real_tidy = select(data_cuantitativa, -ends_with("count"), -ends_with("mean"))
 
 
-chart.Correlation(mean_real_tidy, histogram=TRUE, pch=19)
-chart.Correlation(sd_real_tidy, histogram=TRUE, pch=19)
+chart.Correlation(mean_real_tidy, histogram = TRUE, pch=19)
+#chart.Correlation(sd_real_tidy, histogram = TRUE, pch=19)
 
 sapply(mean_real_tidy, function(x) sum(is.na(x)))
 
-l = apply(mean_real_tidy,2,var)
-l
 
-Wt = t(mean_real_tidy)-colMeans(mean_real_tidy)
-Wt %*% t(Wt)/(n-1)
+cov(mean_real_tidy)
 ```
 
+Variables más correlacionadas positivamente (las variables correlacionadas crecerán o decrecerán directamente proporcional):
 
+- `BUN` (Nitrógeno en sangre) y `Creatinine`, con una covarianza de $18.62$
+
+- `SAPS-I` ("Puntuación simplificada de fisiología aguda") y `SOFA` ("Evaluación secuencial de insuficiencia orgánica"), con una covarianza de $14.01$
+
+
+Variables más correlacionadas negativamente (las variables correlacionadas crecerán o decrecerán inversamente proporcional):
+
+- `SAPS-I` y `GCS` (Glasgow), con una covarianza de $-9.48$
+
+- `SOFA` y `GCS`, con una covarianza de $-7.73$
+
+
+Si haciendo estas gráficas diferenciando por el tipo de UCI no notamos diferencias significativas con la conclusión que hayamos podido sacar juntando todas las UCIS no añadiremos notaciones.
+
+### UCI 1 - Cuidados coronarios
+
+```{r, fig.width=10, fig.height=6}
+# Seleccionamos los datos cuantitativos de la UCI 1
+data_cuant1 = data_real_tidy %>% 
+              filter(ICUType == 1) %>%
+              select(-RecordID, -Gender, -ICUType, -`In-hospital_death`)
+
+# Solo guardamos las columnas que nos dan las medias de las 5 variables
+mean_data1 = select(data_cuant1, -ends_with("count"), -ends_with("sd"))
+
+
+# Graficamos por pares las correlaciones de las variables
+chart.Correlation(mean_data1, histogram = TRUE, pch=19)
+
+# Calculamos la matriz de varianzas-covarianzas
+cov(mean_data1)
+
+```
+
+### UCI 2 - Recuperación cirugía cardíaca
+
+```{r, fig.width=10, fig.height=6}
+# Seleccionamos los datos cuantitativos de la UCI 1
+data_cuant2 = data_real_tidy %>% 
+              filter(ICUType == 2) %>%
+              select(-RecordID, -Gender, -ICUType, -`In-hospital_death`)
+
+# Solo guardamos las columnas que nos dan las medias de las 5 variables
+mean_data2 = select(data_cuant2, -ends_with("count"), -ends_with("sd"))
+
+
+# Graficamos por pares las correlaciones de las variables
+chart.Correlation(mean_data2, histogram = TRUE, pch=19)
+
+# Calculamos la matriz de varianzas-covarianzas
+cov(mean_data2)
+
+```
+
+### UCI 3 - Medical UCI
+
+```{r, fig.width=10, fig.height=6}
+# Seleccionamos los datos cuantitativos de la UCI 1
+data_cuant3 = data_real_tidy %>% 
+              filter(ICUType == 3) %>%
+              select(-RecordID, -Gender, -ICUType, -`In-hospital_death`)
+
+# Solo guardamos las columnas que nos dan las medias de las 5 variables
+mean_data3 = select(data_cuant3, -ends_with("count"), -ends_with("sd"))
+
+
+# Graficamos por pares las correlaciones de las variables
+chart.Correlation(mean_data3, histogram = TRUE, pch=19)
+
+# Calculamos la matriz de varianzas-covarianzas
+cov(mean_data3)
+
+```
+
+### UCI 4 - Cirugía
+
+```{r, fig.width=10, fig.height=6}
+# Seleccionamos los datos cuantitativos de la UCI 1
+data_cuant4 = data_real_tidy %>% 
+              filter(ICUType == 4) %>%
+              select(-RecordID, -Gender, -ICUType, -`In-hospital_death`)
+
+# Solo guardamos las columnas que nos dan las medias de las 5 variables
+mean_data4 = select(data_cuant2, -ends_with("count"), -ends_with("sd"))
+
+# Graficamos por pares las correlaciones de las variables
+chart.Correlation(mean_data4, histogram = TRUE, pch=19)
+
+# Calculamos la matriz de varianzas-covarianzas
+cov(mean_data4)
+
+```
+
+Lo único que ha podido cambiar han sido los valores de los coeficientes de correlación y covarianzas. Pero efectivamente se han mantenido las mismas variables.
+
+Con esta información concluimos que al hacer ACP podremos reducir dimensionalidad.
+
+
+# Análisis analítico
+
+## Análisis de componetes principales
+
+Como ya hemos visto en las correlaciones, podremos reducir la dimensionalidad para poder realizar un ACP y así ver cuales son las componentes que más influyen en la mortalidad del paciente.
+
+### UCI 1
+```{r}
+# Mediante la funcion prcomp realizamos un análisis de componentes principales y devuelve los pesos de las variables al hacer las diferentes reducciones de dimensionalidad
+mean_data1.acp = prcomp(mean_data1[,4:12], scale = TRUE)
+mean_data1.acp
+``` 
+
+Si empezamos imprimiendo la gráfica de los valores propios/varianzas entre el número de dimensión del ACP.
+
+```{r}
+fviz_eig(mean_data1.acp)
+```
+
+Mediante la regla del codo pensaríamos que el mayor salto está en la dimensión dos. Veamos qué información podemos obtener a partir de los valores propios.
+
+
+```{r}
+get_eigenvalue(mean_data1.acp)
+```
+
+Con sólo 2 componentes principales estaríamos explicando casi el 52% de la variación total (demasiado bajo). Hay diferentes criterios para determinar la dimensión más óptima para el análisis.
+
+- Si miramos a partir de qué dimensión el valor propio és menor a 1, escogeríamos 3 componentes principales, pero sólo estaríamos contemplando el 62.92% de variación.
+
+- Si decidimos directamente marcarnos que queremos explicar más del 85%, necesitaríamos hacer el ACP de dimensión 6.
+
+Recordemos lo que hemos obtenido en el apartado anterior. Cuando hemos realizado el análisis estadístico multivariado, nos han salido 4 variables muy correlacionadas (dos a dos) y una correlacionada negativamente con una pareja de las anteriores. Así pues sería lógico que de 9 variables iniciales que estamos contemplando, quitaramos al menos 3 de ellas "juntando" aquellas que están correlacionadas.
+
+Comprobemos que si realmente decidimos coger dimensión 6:
+
+- Los pesos de las variables `SOFA` y `SAPS-I` deberían ir "a la par" (mismo signo y valores cercanos) y con cambio de signo respecto `GCS`.
+
+- Y de igual manera con `Creatinine` y `BUN`.
+
+```{r}
+mean_data1.acp$rotation[,6]
+```
+
+```{r}
+fviz_pca_var(mean_data1.acp,
+col.var = "contrib",
+gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),repel = TRUE
+)
+```
+
+Al ver que todo nos cuadra, decidimos hacer el ACP de dimensión 6.
+
+```{r}
+fviz_pca_ind(mean_data1.acp,
+col.ind = "cos2", #Color de acuerdo a la calidad de la representación.
+gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+repel = TRUE # Para evitar que el texto se solape
+)
+
+fviz_pca_biplot(mean_data1.acp, repel = TRUE,
+col.var = "#2E9FDF", # color para las variables
+col.ind = "#696969" # color para las observaciones
+)
+
+
+data_real_tidy$`In-hospital_death` = as.factor(data_real_tidy$`In-hospital_death`)
+data = filter(data_real_tidy, ICUType == 1)
+data
+
+
+autoplot(mean_data1.acp, data = filter(data_real_tidy, ICUType == 1), colour = data$`In-hospital_death`,
+         loadings = TRUE, loadings.colour = 'blue', loadings.label = TRUE, loadings.label.size = 3)
+```
 
 
 

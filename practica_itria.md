@@ -70,9 +70,9 @@ lista_pacientes_set_a[1]
 
 - `Tipo UCI`
 
-- `SAPSI`
+- `SAPSI` ("Simplified Acute Physiology Score" estima la probabilitat de mortalitat del pacient d'UCI.)
 
-- `SOFA`
+- `SOFA` ("Sequential Organ Failure Assessment"  Es utilizado para seguir el estado del paciente durante su estadía en la Unidad de UC.)
 
 - `LOS`
 
@@ -840,6 +840,10 @@ Ahora que ya sabemos los nombres de las 5 variables que nos ayudarán a hacer un
 # Selecionamos manualmente (como antes) las 5 variables que usaremos durante lo que queda de trabajo
 data_real_tidy = select(data_tidy, contains("RecordID"),  contains("Age"),  contains("Gender"),  contains("Height"),  contains("Weight"),  contains("ICUType"),  contains("SAPS-I"),  contains("SOFA"),  contains("Length_of_stay"),  contains("Survival"),  contains("In-hospital_death"), contains("GCS"), contains("BUN"),  contains("Urine"), contains("HCO3"), contains("Creatinine"))
 
+data_real_tidy = drop_na(data_real_tidy)
+
+
+
 # Mostramos por pantalla la tabla final
 head(data_real_tidy) %>%
   kable() %>%
@@ -1064,27 +1068,396 @@ head(data_real_tidy) %>%
 
 
 
-
 # Análisis descriptivo multivariado
 
+## Histogramas entre las variables cualitativas
 
+
+
+## ¿Qué variables influyen más mortalidad?
+
+
+
+## ¿El tipo de UCI marca muchas diferencias respecto el nivel de mortalidad?
+
+
+
+## Correlación entre variables
+
+Empezamos realizando un análisis estadístico multivariante sin separar las variables por tipo de UCI. Las conclusiones que podamos sacar estarán más generalizadas respecto al estudio individual.
+
+A la hora de calcular las correlaciones entre las variables por ejemplo, al variar entre los diferentes tipos de UCI's, los coeficientes de correlación variarán pero no cambiará respecto a qué variables están correlacionadas entre ellas.
 
 
 ```r
-# Para mayor facilidad en el calculo de correlacion
-mean_real_tidy = select(data_real_tidy,-RecordID, -ends_with("count"), -ends_with("sd"))
-sd_real_tidy = select(data_real_tidy,-RecordID, -ends_with("count"), -ends_with("mean"))
+data_cualitativa = select(data_real_tidy, Gender, ICUType, `In-hospital_death`)
+data_cuantitativa = select(data_real_tidy, -RecordID, -Gender, -ICUType, -`In-hospital_death`)
 
-chart.Correlation(mean_real_tidy, histogram=TRUE, pch=19)
+
+# Para mayor facilidad en el calculo de correlacion
+mean_real_tidy = select(data_cuantitativa, -ends_with("count"), -ends_with("sd"))
+#sd_real_tidy = select(data_cuantitativa, -ends_with("count"), -ends_with("mean"))
+
+
+chart.Correlation(mean_real_tidy, histogram = TRUE, pch=19)
 ```
 
 ![](practica_itria_files/figure-html/unnamed-chunk-13-1.png)<!-- -->
 
 ```r
-chart.Correlation(sd_real_tidy, histogram=TRUE, pch=19)
+#chart.Correlation(sd_real_tidy, histogram = TRUE, pch=19)
+
+sapply(mean_real_tidy, function(x) sum(is.na(x)))
 ```
 
-![](practica_itria_files/figure-html/unnamed-chunk-13-2.png)<!-- -->
+```
+##             Age          Height          Weight          SAPS-I 
+##               0               0               0               0 
+##            SOFA  Length_of_stay        Survival        GCS_mean 
+##               0               0               0               0 
+##        BUN_mean      Urine_mean       HCO3_mean Creatinine_mean 
+##               0               0               0               0
+```
+
+```r
+cov(mean_real_tidy)
+```
+
+```
+##                          Age      Height      Weight       SAPS-I
+## Age              302.7873960   76.027057  -69.886564   24.5478724
+## Height            76.0270571 7468.947974  627.822076   77.4782467
+## Weight           -69.8865640  627.822076  940.120695   10.6061277
+## SAPS-I            24.5478724   77.478247   10.606128   27.7494870
+## SOFA               5.2034386   86.811907   24.885338   14.0127278
+## Length_of_stay    -8.4927089   43.062859   29.133133    9.6705371
+## Survival         797.2277913  530.864211 -510.456816   14.3338343
+## GCS_mean           2.1596737  -25.221090  -14.649066   -9.4805524
+## BUN_mean          81.2107527  -61.328265   55.386070   12.9271215
+## Urine_mean      -525.1692574 -581.454002 -124.798862 -134.7066514
+## HCO3_mean          0.1193153   -8.141638    2.435573   -4.0781536
+## Creatinine_mean    0.6802213    1.841152    4.064283    0.9034595
+##                        SOFA Length_of_stay     Survival   GCS_mean
+## Age                5.203439      -8.492709    797.22779   2.159674
+## Height            86.811907      43.062859    530.86421 -25.221090
+## Weight            24.885338      29.133133   -510.45682 -14.649066
+## SAPS-I            14.012728       9.670537     14.33383  -9.480552
+## SOFA              16.861816       8.073878    -25.98414  -7.725064
+## Length_of_stay     8.073878     150.475159    250.80449  -9.535526
+## Survival         -25.984136     250.804490 132148.66093  52.097174
+## GCS_mean          -7.725064      -9.535526     52.09717  10.560970
+## BUN_mean          20.808964      23.476266    259.70838  -2.506909
+## Urine_mean      -126.951965    -154.205472   -917.07680  62.281332
+## HCO3_mean         -4.440546      -3.683750     40.12065   2.187116
+## Creatinine_mean    1.439237       1.139309     11.02961  -0.180742
+##                    BUN_mean  Urine_mean   HCO3_mean Creatinine_mean
+## Age               81.210753  -525.16926   0.1193153       0.6802213
+## Height           -61.328265  -581.45400  -8.1416377       1.8411518
+## Weight            55.386070  -124.79886   2.4355732       4.0642828
+## SAPS-I            12.927121  -134.70665  -4.0781536       0.9034595
+## SOFA              20.808964  -126.95196  -4.4405459       1.4392372
+## Length_of_stay    23.476266  -154.20547  -3.6837504       1.1393091
+## Survival         259.708376  -917.07680  40.1206532      11.0296081
+## GCS_mean          -2.506909    62.28133   2.1871157      -0.1807420
+## BUN_mean         423.203036  -483.51175 -21.0474126      18.6162353
+## Urine_mean      -483.511746 14073.30639  52.6256877     -25.9905392
+## HCO3_mean        -21.047413    52.62569  16.5517749      -1.4906001
+## Creatinine_mean   18.616235   -25.99054  -1.4906001       1.6354144
+```
+
+Variables más correlacionadas positivamente (las variables correlacionadas crecerán o decrecerán directamente proporcional):
+
+- `BUN` (Nitrógeno en sangre) y `Creatinine`, con una covarianza de $18.62$
+
+- `SAPS-I` ("Puntuación simplificada de fisiología aguda") y `SOFA` ("Evaluación secuencial de insuficiencia orgánica"), con una covarianza de $14.01$
+
+
+Variables más correlacionadas negativamente (las variables correlacionadas crecerán o decrecerán inversamente proporcional):
+
+- `SAPS-I` y `GCS` (Glasgow), con una covarianza de $-9.48$
+
+- `SOFA` y `GCS`, con una covarianza de $-7.73$
+
+
+Si haciendo estas gráficas diferenciando por el tipo de UCI no notamos diferencias significativas con la conclusión que hayamos podido sacar juntando todas las UCIS no añadiremos notaciones.
+
+### UCI 1 - Cuidados coronarios
+
+
+```r
+# Seleccionamos los datos cuantitativos de la UCI 1
+data_cuant1 = data_real_tidy %>% 
+              filter(ICUType == 1) %>%
+              select(-RecordID, -Gender, -ICUType, -`In-hospital_death`)
+
+# Solo guardamos las columnas que nos dan las medias de las 5 variables
+mean_data1 = select(data_cuant1, -ends_with("count"), -ends_with("sd"))
+
+
+# Graficamos por pares las correlaciones de las variables
+chart.Correlation(mean_data1, histogram = TRUE, pch=19)
+```
+
+![](practica_itria_files/figure-html/unnamed-chunk-14-1.png)<!-- -->
+
+```r
+# Calculamos la matriz de varianzas-covarianzas
+cov(mean_data1)
+```
+
+```
+##                         Age      Height       Weight      SAPS-I
+## Age              215.748979  -73.993816  -95.2168457   21.925026
+## Height           -73.993816 7009.354555  627.1300694   32.609926
+## Weight           -95.216846  627.130069  767.0937934    1.711360
+## SAPS-I            21.925026   32.609926    1.7113601   28.769706
+## SOFA               6.519873   41.217459   15.4049703   16.194111
+## Length_of_stay    -1.339266   65.025433   14.5813288   10.587525
+## Survival         567.696400 1325.334529 -518.9415140    9.651770
+## GCS_mean           1.675787  -32.442845  -12.3980653  -11.578176
+## BUN_mean          88.622024   24.928953   38.0336373   23.131541
+## Urine_mean      -518.189126 -535.612401  -41.5880817 -241.583655
+## HCO3_mean          3.854745  -28.373051   -0.8534206   -6.950612
+## Creatinine_mean    1.042728    2.187376    5.1883523    1.475589
+##                        SOFA Length_of_stay      Survival    GCS_mean
+## Age                6.519873      -1.339266    567.696400   1.6757872
+## Height            41.217459      65.025433   1325.334529 -32.4428450
+## Weight            15.404970      14.581329   -518.941514 -12.3980653
+## SAPS-I            16.194111      10.587525      9.651770 -11.5781759
+## SOFA              17.331413       6.647377     -8.585376  -9.4376444
+## Length_of_stay     6.647377      99.277929    154.369374  -5.7149708
+## Survival          -8.585376     154.369374 142313.137018  79.7270564
+## GCS_mean          -9.437644      -5.714971     79.727056  10.9366916
+## BUN_mean          22.514428      38.072047    228.805634   0.1380971
+## Urine_mean      -169.361828    -118.991798     10.323134 104.5325051
+## HCO3_mean         -5.953283      -4.527243    -22.286229   4.2951041
+## Creatinine_mean    1.469341       2.096670     27.759634  -0.2159081
+##                     BUN_mean  Urine_mean   HCO3_mean Creatinine_mean
+## Age               88.6220236  -518.18913   3.8547448       1.0427280
+## Height            24.9289531  -535.61240 -28.3730506       2.1873760
+## Weight            38.0336373   -41.58808  -0.8534206       5.1883523
+## SAPS-I            23.1315410  -241.58365  -6.9506124       1.4755888
+## SOFA              22.5144285  -169.36183  -5.9532829       1.4693406
+## Length_of_stay    38.0720475  -118.99180  -4.5272427       2.0966700
+## Survival         228.8056341    10.32313 -22.2862288      27.7596336
+## GCS_mean           0.1380971   104.53251   4.2951041      -0.2159081
+## BUN_mean         423.3695610  -582.14017 -12.3560229      16.4734637
+## Urine_mean      -582.1401672 10546.07759  67.9105695     -28.5237029
+## HCO3_mean        -12.3560229    67.91057  16.2816408      -1.0568553
+## Creatinine_mean   16.4734637   -28.52370  -1.0568553       1.6356827
+```
+
+### UCI 2 - Recuperación cirugía cardíaca
+
+
+```r
+# Seleccionamos los datos cuantitativos de la UCI 1
+data_cuant2 = data_real_tidy %>% 
+              filter(ICUType == 2) %>%
+              select(-RecordID, -Gender, -ICUType, -`In-hospital_death`)
+
+# Solo guardamos las columnas que nos dan las medias de las 5 variables
+mean_data2 = select(data_cuant2, -ends_with("count"), -ends_with("sd"))
+
+
+# Graficamos por pares las correlaciones de las variables
+chart.Correlation(mean_data2, histogram = TRUE, pch=19)
+```
+
+![](practica_itria_files/figure-html/unnamed-chunk-15-1.png)<!-- -->
+
+```r
+# Calculamos la matriz de varianzas-covarianzas
+cov(mean_data2)
+```
+
+```
+##                         Age       Height      Weight      SAPS-I
+## Age              164.152590    -9.132644  -79.980639  20.4450781
+## Height            -9.132644  1734.388134  236.269554  25.3553296
+## Weight           -79.980639   236.269554  450.090409 -12.9519989
+## SAPS-I            20.445078    25.355330  -12.951999  21.4881258
+## SOFA               6.698900    32.055845    4.896950   9.0484016
+## Length_of_stay     5.433109   -22.554384   -8.406753   5.1330483
+## Survival         848.966376 -1329.883887 -680.981441 -32.8522718
+## GCS_mean          -3.706823    -8.679242   -2.944719  -6.0957770
+## BUN_mean          20.085387   -17.547063   21.612472   9.3681516
+## Urine_mean      -133.949095    61.711519   11.429302 -38.0676658
+## HCO3_mean         -5.250172    -7.423032    4.369940  -2.2146865
+## Creatinine_mean   -1.180676    -1.334965    1.651347   0.5962937
+##                        SOFA Length_of_stay      Survival    GCS_mean
+## Age               6.6988999       5.433109    848.966376  -3.7068225
+## Height           32.0558453     -22.554384  -1329.883887  -8.6792424
+## Weight            4.8969496      -8.406753   -680.981441  -2.9447188
+## SAPS-I            9.0484016       5.133048    -32.852272  -6.0957770
+## SOFA             10.7906656       5.548122    -20.234393  -4.8716402
+## Length_of_stay    5.5481223     134.922407    399.525450 -10.7818760
+## Survival        -20.2343926     399.525450 181962.699063   4.4613586
+## GCS_mean         -4.8716402     -10.781876      4.461359   8.1252938
+## BUN_mean          8.4618281      31.664030    449.556232  -4.7887103
+## Urine_mean      -43.9520280    -110.438015  -2972.046171  15.1046510
+## HCO3_mean        -2.3830268      -5.293724   -105.267244   1.6928042
+## Creatinine_mean   0.8844077       1.679038     19.638614  -0.3913367
+##                    BUN_mean  Urine_mean    HCO3_mean Creatinine_mean
+## Age               20.085387  -133.94910   -5.2501718      -1.1806764
+## Height           -17.547063    61.71152   -7.4230323      -1.3349650
+## Weight            21.612472    11.42930    4.3699404       1.6513467
+## SAPS-I             9.368152   -38.06767   -2.2146865       0.5962937
+## SOFA               8.461828   -43.95203   -2.3830268       0.8844077
+## Length_of_stay    31.664030  -110.43801   -5.2937237       1.6790380
+## Survival         449.556232 -2972.04617 -105.2672441      19.6386144
+## GCS_mean          -4.788710    15.10465    1.6928042      -0.3913367
+## BUN_mean         117.993277  -259.16657   -8.0903612       7.1349608
+## Urine_mean      -259.166573  3119.44810   36.0374867     -18.0497577
+## HCO3_mean         -8.090361    36.03749    7.2855473      -0.6405231
+## Creatinine_mean    7.134961   -18.04976   -0.6405231       0.9241415
+```
+
+### UCI 3 - Medical UCI
+
+
+```r
+# Seleccionamos los datos cuantitativos de la UCI 1
+data_cuant3 = data_real_tidy %>% 
+              filter(ICUType == 3) %>%
+              select(-RecordID, -Gender, -ICUType, -`In-hospital_death`)
+
+# Solo guardamos las columnas que nos dan las medias de las 5 variables
+mean_data3 = select(data_cuant3, -ends_with("count"), -ends_with("sd"))
+
+
+# Graficamos por pares las correlaciones de las variables
+chart.Correlation(mean_data3, histogram = TRUE, pch=19)
+```
+
+![](practica_itria_files/figure-html/unnamed-chunk-16-1.png)<!-- -->
+
+```r
+# Calculamos la matriz de varianzas-covarianzas
+cov(mean_data3)
+```
+
+```
+##                          Age      Height      Weight      SAPS-I
+## Age              338.2258393  -67.787256  -93.638396   20.735884
+## Height           -67.7872556 6127.421079  498.235682   12.104673
+## Weight           -93.6383959  498.235682 1260.087165   10.021042
+## SAPS-I            20.7358841   12.104673   10.021042   27.242320
+## SOFA              -1.0742291   37.568337   27.193791   12.815616
+## Length_of_stay   -15.6468650   52.922820   27.937727   10.761817
+## Survival         540.4815744 -455.727011 -830.585645   -3.565397
+## GCS_mean           4.6944815  -27.348318  -17.560101   -9.872718
+## BUN_mean         111.9689083  116.730334  102.502485   20.091825
+## Urine_mean      -610.9831575 -495.008170 -191.522494 -170.426662
+## HCO3_mean          4.7692283  -14.687132    8.109532   -4.824961
+## Creatinine_mean    0.5005759    9.794754    6.243893    1.300553
+##                        SOFA Length_of_stay      Survival    GCS_mean
+## Age               -1.074229    -15.6468650    540.481574   4.6944815
+## Height            37.568337     52.9228203   -455.727011 -27.3483180
+## Weight            27.193791     27.9377265   -830.585645 -17.5601005
+## SAPS-I            12.815616     10.7618172     -3.565397  -9.8727183
+## SOFA              17.703673      8.4876664    -79.600318  -9.0173372
+## Length_of_stay     8.487666    149.6912671    415.533157  -8.4073395
+## Survival         -79.600318    415.5331568 120861.070883  25.0828105
+## GCS_mean          -9.017337     -8.4073395     25.082811  11.3064924
+## BUN_mean          38.560700     20.1148427     47.855223  -6.1259693
+## Urine_mean      -179.019294   -180.9631560    140.243399 101.9597459
+## HCO3_mean         -6.181464     -0.4441275    181.893108   1.7395661
+## Creatinine_mean    2.318858      1.2142697     -4.127943  -0.2132469
+##                    BUN_mean  Urine_mean   HCO3_mean Creatinine_mean
+## Age              111.968908  -610.98316   4.7692283       0.5005759
+## Height           116.730334  -495.00817 -14.6871325       9.7947544
+## Weight           102.502485  -191.52249   8.1095318       6.2438933
+## SAPS-I            20.091825  -170.42666  -4.8249609       1.3005527
+## SOFA              38.560700  -179.01929  -6.1814638       2.3188577
+## Length_of_stay    20.114843  -180.96316  -0.4441275       1.2142697
+## Survival          47.855223   140.24340 181.8931080      -4.1279431
+## GCS_mean          -6.125969   101.95975   1.7395661      -0.2132469
+## BUN_mean         679.685827  -788.78697 -34.2022323      30.8242089
+## Urine_mean      -788.786971 20731.91768  89.6403287     -41.3664494
+## HCO3_mean        -34.202232    89.64033  24.9145909      -2.5161613
+## Creatinine_mean   30.824209   -41.36645  -2.5161613       2.6330786
+```
+
+### UCI 4 - Cirugía
+
+
+```r
+# Seleccionamos los datos cuantitativos de la UCI 1
+data_cuant4 = data_real_tidy %>% 
+              filter(ICUType == 4) %>%
+              select(-RecordID, -Gender, -ICUType, -`In-hospital_death`)
+
+# Solo guardamos las columnas que nos dan las medias de las 5 variables
+mean_data4 = select(data_cuant2, -ends_with("count"), -ends_with("sd"))
+
+# Graficamos por pares las correlaciones de las variables
+chart.Correlation(mean_data4, histogram = TRUE, pch=19)
+```
+
+![](practica_itria_files/figure-html/unnamed-chunk-17-1.png)<!-- -->
+
+```r
+# Calculamos la matriz de varianzas-covarianzas
+cov(mean_data4)
+```
+
+```
+##                         Age       Height      Weight      SAPS-I
+## Age              164.152590    -9.132644  -79.980639  20.4450781
+## Height            -9.132644  1734.388134  236.269554  25.3553296
+## Weight           -79.980639   236.269554  450.090409 -12.9519989
+## SAPS-I            20.445078    25.355330  -12.951999  21.4881258
+## SOFA               6.698900    32.055845    4.896950   9.0484016
+## Length_of_stay     5.433109   -22.554384   -8.406753   5.1330483
+## Survival         848.966376 -1329.883887 -680.981441 -32.8522718
+## GCS_mean          -3.706823    -8.679242   -2.944719  -6.0957770
+## BUN_mean          20.085387   -17.547063   21.612472   9.3681516
+## Urine_mean      -133.949095    61.711519   11.429302 -38.0676658
+## HCO3_mean         -5.250172    -7.423032    4.369940  -2.2146865
+## Creatinine_mean   -1.180676    -1.334965    1.651347   0.5962937
+##                        SOFA Length_of_stay      Survival    GCS_mean
+## Age               6.6988999       5.433109    848.966376  -3.7068225
+## Height           32.0558453     -22.554384  -1329.883887  -8.6792424
+## Weight            4.8969496      -8.406753   -680.981441  -2.9447188
+## SAPS-I            9.0484016       5.133048    -32.852272  -6.0957770
+## SOFA             10.7906656       5.548122    -20.234393  -4.8716402
+## Length_of_stay    5.5481223     134.922407    399.525450 -10.7818760
+## Survival        -20.2343926     399.525450 181962.699063   4.4613586
+## GCS_mean         -4.8716402     -10.781876      4.461359   8.1252938
+## BUN_mean          8.4618281      31.664030    449.556232  -4.7887103
+## Urine_mean      -43.9520280    -110.438015  -2972.046171  15.1046510
+## HCO3_mean        -2.3830268      -5.293724   -105.267244   1.6928042
+## Creatinine_mean   0.8844077       1.679038     19.638614  -0.3913367
+##                    BUN_mean  Urine_mean    HCO3_mean Creatinine_mean
+## Age               20.085387  -133.94910   -5.2501718      -1.1806764
+## Height           -17.547063    61.71152   -7.4230323      -1.3349650
+## Weight            21.612472    11.42930    4.3699404       1.6513467
+## SAPS-I             9.368152   -38.06767   -2.2146865       0.5962937
+## SOFA               8.461828   -43.95203   -2.3830268       0.8844077
+## Length_of_stay    31.664030  -110.43801   -5.2937237       1.6790380
+## Survival         449.556232 -2972.04617 -105.2672441      19.6386144
+## GCS_mean          -4.788710    15.10465    1.6928042      -0.3913367
+## BUN_mean         117.993277  -259.16657   -8.0903612       7.1349608
+## Urine_mean      -259.166573  3119.44810   36.0374867     -18.0497577
+## HCO3_mean         -8.090361    36.03749    7.2855473      -0.6405231
+## Creatinine_mean    7.134961   -18.04976   -0.6405231       0.9241415
+```
+
+Lo único que ha podido cambiar han sido los valores de los coeficientes de correlación y covarianzas. Pero efectivamente se han mantenido las mismas variables.
+
+Con esta información concluimos que al hacer ACP podremos reducir dimensionalidad.
+
+
+# Análisis analítico
+
+## Análisis de componetes principales
+
+Como ya hemos visto en las correlaciones, podremos reducir la dimensionalidad para poder realizar un ACP y así ver las componentes que más influyan a la mortalidad del paciente.
+
+
+
+
 
 
 
