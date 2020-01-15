@@ -1,6 +1,6 @@
 ---
 title: "Carga inicial datos: Physionet 2012 UCI data mortality"
-author: "Ricardo Alberich, Irene Garcia"
+author: "Arturo González, Jun De Wu, Ítria Mascaró"
 time:  "`Sys.Date()`"
 output: 
   html_document: 
@@ -12,9 +12,22 @@ output:
     toc: yes
 ---
 
-```{r setup0, include=FALSE}
+```{r setup0, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE,cache=TRUE)
 library("tidyverse")
+library("gridExtra")
+library("tidyr")
+
+# Para la impresión de tablas
+library("knitr")
+library("kableExtra") 
+
+# Para el anállisis descriptivo multivariado
+library("GGally")
+library("PerformanceAnalytics")
+library("ggcorrplot")
+library("aplpack")
+
 ```
 
 # Introducción: Physionet 2012 UCI data mortality
@@ -54,6 +67,23 @@ length(lista_pacientes_set_a) # número pacientes en training
 lista_pacientes_set_a[1]
 
 ```
+## Descripción de las variables
+
+- `Edad`
+
+- `Género`
+
+- `Tipo UCI`
+
+- `SAPSI`
+
+- `SOFA`
+
+- `LOS`
+
+- `Survival`
+
+- `In-hospital-death`
 
 
 ```
@@ -82,8 +112,10 @@ leer_paciente = function(file){read_csv(file, col_types = cols(Time = col_charac
                               select(Time_Minutes,Parameter,Value)}
 
 #leer_paciente(list_files[1])
-raw_data = lapply(list_files,leer_paciente)# lista de los datos por paciente
-#extraer perfiles "RecordID" "Age"      "Gender"   "Height"   "Weight"   "ICUType" 
+
+raw_data = lapply(list_files,leer_paciente) # lista de los datos por paciente
+
+#extraer perfiles "RecordID" "Age"  "Gender"   "Height"   "Weight"   "ICUType" 
 perfil = function(data_paciente){
             data_paciente %>%
             filter(Parameter %in% c("RecordID","Age","Gender","Height","ICUType","Weight")) %>%
@@ -97,14 +129,13 @@ perfiles =  lapply(raw_data,perfil) %>%
             bind_rows() %>%
             select(RecordID, Age, Gender, Height,Weight,ICUType)
 
-glimpse(perfiles)
-## Ler series
-## se modifica error de time
+glimpse(perfiles) # Printamos la funcion
 
+# Arreglamos el error de time
 serie_UCI_parameter <- function(paciente,parameters){ paciente %>%
                                                       arrange(Parameter,Time_Minutes) %>%
                                                       filter(Parameter %in% parameters) %>%
-                                                      add_column(RecordID=paciente[1,3]$Value) } 
+                                                      add_column(RecordID = paciente[1,3]$Value) } 
 ##ejemplo
 parameters = c("HR","RespRate","GCS")
 serie_paciente1 = serie_UCI_parameter(raw_data[[1]],parameters)
@@ -113,9 +144,9 @@ serie_paciente1
 parameters=c("Albumin","ALP","ALT","AST","Bilirubin","BUN","Cholesterol","Creatinine","DiasABP","FiO2","GCS","Glucose","HCO3","HCT","HR","K","Lactate","Mg","MAP","MechVent","Na","NIDiasABP","NIMAP","NISysABP","PaCO2","PaO2","pH","Platelets","RespRate","SaO2","SysABP","Temp","TropI","TropT","Urine","WBC")
 series_parameters = lapply(raw_data,FUN=function(x) serie_UCI_parameter(x,parameters)) %>%
                     bind_rows()
-glimpse(series_parameters)
-```
 
+glimpse(series_parameters) # Printamos la función
+```
 
 
 
@@ -165,13 +196,13 @@ series_summary =  series_parameters %>%
 data_tidy = Scores_perfilesA %>% inner_join(series_summary)
 ```
 
-Elimino NA
+## LIMPIEZA NA's
 
 ```{r}
-aux=which(is.na(data_tidy$Lactate_count))
+aux = which(is.na(data_tidy$Lactate_count))
 length(aux)
-data_tidy2=data_tidy[-aux,]
-view(data_tidy2)
+data_tidy2 = data_tidy[-aux,]
+#view(data_tidy2)
 ```
 
 Dejamos de considerar por demasiados NA's:
@@ -182,11 +213,12 @@ Dejamos de considerar por demasiados NA's:
 
 
 ```{r}
+#Definimos una función que nos cuente el número de NA's en una variable x
 contar_nas = function(x){
   sum(is.na(x))
-  
 }
 
+#Definimos un programa que la variable x marque TRUE cuando tiene menos de 1500 NA's
 pocos_nas = function(x){
   for(i in 1:length(x)){
     if(contar_nas(x) >= 1500){
@@ -196,57 +228,56 @@ pocos_nas = function(x){
       return(TRUE)
     }
   }
-  
 }
 
 
 #data_tidy3 = drop_na(data_tidy)
 
-
-primera_seleccion = data_tidy %>%
+#Aplicamos la función de TRUE o FALSE para saber qué variables pasan el umbral de 1500 NA's y cuáles no
+seleccion_pocos_nas = data_tidy %>%
   apply( 2, pocos_nas)
 
 
-# VARIABLES CON "POCOS NAS" EN LA VARIABLE COUNT
-nombres = names(primera_seleccion[primera_seleccion])
+# Guardamos sólo los nombres de las variables que en "<VARIABLE>_count" está por debajo los 1500 NA's
+nombres = names(seleccion_pocos_nas[seleccion_pocos_nas])
 nombres
 
-
+#Guardamos en un data set nuevo las variables que nos ha interesado seleccionar con el criterio de NA's
 primera_seleccion = select(data_tidy, nombres)
-View(primera_seleccion)
 
 ```
 
+## SELECCIÓN 10 VARIABLES INICIALES
 
-Hacemos la selección de las 10 variables considerando aquellas que tienen menos NA's
+El criterio de primera selección se basará en considerar las que tengan menos NA's como las más útiles para nuestro estudio.
 
 ```{r}
 # DE LAS SELECCIONADAS, MIRAMOS LAS QUE TIENEN MENOS NA'S Y LAS REORDENAMOS PARA ELEGIR LAS 10 PRIMERAS
-pepe = select(primera_seleccion, ends_with("sd")) %>% apply(2, contar_nas)
+# Para hacerlo nos fijamos sólo en las variables: "<VARIABLE>_sd" mediante un select
+seleccion_menor_nas = select(primera_seleccion, ends_with("sd")) %>% apply(2, contar_nas)
+seleccion_menor_nas
 
-nombres_pocos_nas = sort(pepe)
+# LAS REORDENAMOS PARA PODER COGER SÓLO LAS 10 PRIMERAS
+nombres_pocos_nas = sort(seleccion_menor_nas)
 nombres_pocos_nas
 
+# COGEMOS LAS 10 PRIMERAS
 nombres_def = nombres_pocos_nas[1:10]
 nombres_def
 
-# SOLUCION CUTRE
-
+# DE FORMA MANUAL, VOLVEMOS AL DATA SET ORIGINAL Y SELECCIONAMOS LAS 10 VARIABLES DE "nombres_def"
 data_real_tidy = select(data_tidy, contains("RecordID"),  contains("Age"),  contains("Gender"),  contains("Height"),  contains("Weight"),  contains("ICUType"),  contains("SAPS-I"),  contains("SOFA"),  contains("Length_of_stay"),  contains("Survival"),  contains("In-hospital_death"), contains("HR"), contains("Temp"), contains("GCS"), contains("Creatinine"),  contains("BUN"),  contains("Urine"),  contains("HCT"),  contains("HCO3"),  contains("Platelets"),  contains("WBC"))
 
-
+# Eliminamos los na's que todavía hay y vemos que esta vez no desaparecen todos los datos, 
+# así pues habremos hecho una limpieza que habrá merecido la pena :)
 drop_na(data_real_tidy)
-
-
-#las que tengan mayores diferencias con las muertes de los in hospital death
-
-#comparaciones con un t.test, per saber si ses mitjanes son iguales o no, si soln iguales FUERA
 ```
 
+## SELECCIÓN 5 VARIABLES
 
 Para elegir las 5 que nos aporten mas información a la hora de predecir las muertes, realizamos los siguientes boxplots y contrastes de hipótesis para encontrar aquellas que la muerte y la vida tengan más variación.
 
-```{r}
+```{r, warning = FALSE}
 # Hacemos contraste de hipótesis para saber si deberiamos considerar las
 # varianzas iguales o diferentes para el contraste de medias que haremos a continuación.
 test_varianzas = function(columna){
@@ -256,11 +287,9 @@ test_varianzas = function(columna){
                columna[data_real_tidy$`In-hospital_death` == 1])
   alpha = x$p.value
   if(alpha < 0.05){
-    print('Rechazamos: Las varianzas son diferentes')
     return(FALSE)
   }
   else{
-    print('Aceptamos: Las varianzas son iguales')
     return(TRUE)
   }
 }
@@ -272,102 +301,322 @@ test_medias = function(columna){
   x = t.test(columna[data_real_tidy$`In-hospital_death` == 0],
              columna[data_real_tidy$`In-hospital_death` == 1],
              var.equal = test_varianzas(columna)) # Aquí aplicamos la función anterior como habíamos dicho
+  return(x$p.value)
+}
+
+respuesta_test = function(columna){
+  x = t.test(columna[data_real_tidy$`In-hospital_death` == 0],
+             columna[data_real_tidy$`In-hospital_death` == 1],
+             var.equal = test_varianzas(columna)) # Aplicamos la función anterior para considerar o no var. iguales o diferentes
   alpha = x$p.value
   if(alpha < 0.05){
     print('Rechazamos: Las medias son diferentes')
   }
   else{
-    print('Aceptamos: Las medias son iguales')
+    print('Aceptamos: Las medias son iguales <-')
   }
-    
 }
 
 
 # SELECCIÓN 5 VARIABLES MÁS RELEVANTES PARA PREDECIR LA MUERTE
-
-data_real_tidy$`In-hospital_death` = factor(data_real_tidy$`In-hospital_death`, labels = c("0","1"))
+# Para que podamos hacer los boxplot bien, antes debemos hacer factor la columna de "Muertes en el hospital"
+data_real_tidy$`In-hospital_death` = as.factor(data_real_tidy$`In-hospital_death`)
+# Creamos un array "vacio" que contendrá los valores del p.value del test de medias
+p_valores = c(1:10)
 
 # LATIDO CORAZON -------------------------------------------------------------------------
-data_real_tidy %>%
+p1 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = HR_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = HR_mean)) +
+  labs(x = " vive | muere", y = "Latido corazon")
 
 
-# Basta hacer solo el test de medias ya que dentro de este saldra la solucion del test de varianzas.
-test_medias(data_real_tidy$HR_mean)
+# Hacemos el test de medias de cada una de las variables
+print("Variable: LATIDO CORAZÓN")
+# Guardamos el p_valor para más tarde considerar las 5 mejores como aquellas con el p_valor más bajo
+p_valores[1] = test_medias(data_real_tidy$HR_mean)
+# Imprimimos por pantalla la resolución del test de medias (teniendo el de varianzas ya resuelto dentro del de medias)
+respuesta_test(data_real_tidy$HR_mean)
 
 # TEMPERATURA ----------------------------------------------------------------------------
-data_real_tidy %>%
+p2 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = Temp_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = Temp_mean)) +
+  labs(x = " vive | muere", y = "Temperatura")
 
-test_medias(data_real_tidy$Temp_mean)
+print("Variable: TEMPERATURA")
+p_valores[2] = test_medias(data_real_tidy$Temp_mean)
+respuesta_test(data_real_tidy$Temp_mean)
 
 # GLASGOW --------------------------------------------------------------------------------
-data_real_tidy %>%
+p3 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = GCS_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = GCS_mean)) +
+  labs(x = " vive | muere", y = "Glasgow")
 
-test_medias(data_real_tidy$GCS_mean)
+print("Variable: GLASGOW")
+p_valores[3] = test_medias(data_real_tidy$GCS_mean)
+respuesta_test(data_real_tidy$GCS_mean)
 
 # CREATININA -----------------------------------------------------------------------------
-data_real_tidy %>%
+p4 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = Creatinine_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = Creatinine_mean)) +
+  labs(x = " vive | muere", y = "Creatinina")
 
-test_medias(data_real_tidy$Creatinine_mean)
+print("Variable: CREATININA")
+p_valores[4] = test_medias(data_real_tidy$Creatinine_mean)
+respuesta_test(data_real_tidy$Creatinine_mean)
 
 # NITROGENO EN SANGRE --------------------------------------------------------------------
-data_real_tidy %>%
+p5 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = BUN_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = BUN_mean)) +
+  labs(x = " vive | muere", y = "Ni en sangre")
 
-test_medias(data_real_tidy$BUN_mean)
+print("Variable: NITROGENO EN SANGRE")
+p_valores[5] = test_medias(data_real_tidy$BUN_mean)
+respuesta_test(data_real_tidy$BUN_mean)
 
 # ORINA ----------------------------------------------------------------------------------
-data_real_tidy %>%
+p6 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = Urine_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = Urine_mean)) +
+  labs(x = " vive | muere", y = "Orina")
 
-test_medias(data_real_tidy$Urine_mean)
+print("Variable: ORINA")
+p_valores[6] = test_medias(data_real_tidy$Urine_mean)
+respuesta_test(data_real_tidy$Urine_mean)
 
 # HEMATOCRITO ----------------------------------------------------------------------------
-data_real_tidy %>%
+p7 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = HCT_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = HCT_mean)) +
+  labs(x = " vive | muere", y = "Hematocrito")
 
-test_medias(data_real_tidy$HCT_mean) #Aqui aceptamos las medias, así HTC no nos interesa
+print("Variable: HEMATOCRITO")
+p_valores[7] = test_medias(data_real_tidy$HCT_mean) # Se acepta que las medias son iguales, así HTC no nos interesa
+respuesta_test(data_real_tidy$HCT_mean)
 
 # SERUM BICARBONADO ----------------------------------------------------------------------
-data_real_tidy %>%
+p8 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = HCO3_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = HCO3_mean)) +
+  labs(x = " vive | muere", y = "Serum bicarbonado")
 
-test_medias(data_real_tidy$HCO3_mean)
+print("Variable: SERUM BICARBONADO")
+p_valores[8] = test_medias(data_real_tidy$HCO3_mean)
+respuesta_test(data_real_tidy$HCO3_mean)
 
 # PLAQUETAS ------------------------------------------------------------------------------
-data_real_tidy %>%
+p9 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = Platelets_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = Platelets_mean)) +
+  labs(x = " vive | muere", y = "Plaquetas")
 
-test_medias(data_real_tidy$Platelets_mean) #Aceptamos las medias, así Platelets no nos interesa
+print("Variable: PLAQUETAS")
+p_valores[9] = test_medias(data_real_tidy$Platelets_mean) 
+respuesta_test(data_real_tidy$Platelets_mean) # Se acepta que las medias son iguales, así Platelets no nos interesa
 
 # GLOBULOS BLANCOS SANGRE ----------------------------------------------------------------
-data_real_tidy %>%
+p10 <- data_real_tidy %>%
   ggplot() +
-  geom_boxplot(aes( x = `In-hospital_death`, y = WBC_mean))
+  geom_boxplot(aes( x = `In-hospital_death`, y = WBC_mean)) +
+  labs(x = " vive | muere", y = "Globulos blancos")
 
-test_medias(data_real_tidy$WBC_mean)
+print("Variable: GLOBULOS BLANCOS EN SANGRE")
+p_valores[10] = test_medias(data_real_tidy$WBC_mean)
+respuesta_test(data_real_tidy$WBC_mean)
+
+# Imprimimos los boxplot de forma más compacta para ahorrar espacio
+grid.arrange(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10, nrow = 2)
 
 ```
-
 
 Hemos descubierto que Platelets y HTC no vale la pena considerarlos. Falta elegir de entre los 8 restantes, cuales son los que presentan mayor varianza. Ésto se puede ver mejor en los boxplot.
 
+Lo que nos interesa ahora es coger de las que sí presentan diferencias, elegir las que el p-valor sea más bajo ya que serán aquellas que nos aportarán más información.
+
+```{r}
+# Creamos un array que nos guarde los nombres de las 10 variables con las que trabajamos
+diez_variables = names(select(data_real_tidy, ends_with("mean")))
+
+# Creamos una tibble que de cada variable nos diga su p-valor en el contraste de medias
+tabla_p_valores = as_tibble(data.frame(diez_variables, p_valores))
+tabla_p_valores
+
+
+# Las reordenamos de menor a mayor para quedarnos sólo con las 5 primeras (con el p-valor más bajo)
+cinco_variables = arrange(tabla_p_valores,p_valores)[1:5,1]
+cinco_variables
+```
+
+Ahora que ya sabemos los nombres de las 5 variables que nos ayudarán a hacer un estudio más preciso, creamos la tabla final de datos sólo con estas variables.
+
+```{r}
+# Selecionamos manualmente (como antes) las 5 variables que usaremos durante lo que queda de trabajo
+data_real_tidy = select(data_tidy, contains("RecordID"),  contains("Age"),  contains("Gender"),  contains("Height"),  contains("Weight"),  contains("ICUType"),  contains("SAPS-I"),  contains("SOFA"),  contains("Length_of_stay"),  contains("Survival"),  contains("In-hospital_death"), contains("GCS"), contains("BUN"),  contains("Urine"), contains("HCO3"), contains("Creatinine"))
+
+data_real_tidy=filter(data_real_tidy,Gender!=-1)
+data_real_tidy = drop_na(data_real_tidy)
+
+
+
+# Mostramos por pantalla la tabla final
+head(data_real_tidy) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+  scroll_box(width = "910px")
 
 ```
-hola= series_parameters %>% spread(Parameter,Value)
-import=c()
-chart.Correlation(hola[], histogram=TRUE, pch=19)
+
+## Descripción de las cinco variables seleccionadas
+
+- `GCS` (Glasgow): 
+
+- `BUN` (Nitrógeno en sangre):
+
+- `HCO3` (Serum bicarbonado):
+
+- `Creatinine` (Creatinina):
+
+- `Urine` (orina):
+
+
+
+
+# Análisis descriptivo multivariado
+
+
+
+```{r, fig.width=10, fig.height=6}
+
+n = nrow(data_real_tidy)
+
+data_cualitativa = select(data_real_tidy,Gender, ICUType, `In-hospital_death`)
+data_cuantitativa = select(data_real_tidy, -RecordID, -Gender, -ICUType, -`In-hospital_death`)
+data_cualitativa$Gender = as_factor(data_cualitativa$Gender, labels = c("0","1"))
+data_cualitativa$`In-hospital_death` = as_factor(data_cualitativa$`In-hospital_death`, labels = c("0","1"))
+# Para mayor facilidad en el calculo de correlacion
+mean_real_tidy = select(data_cuantitativa, -ends_with("count"), -ends_with("sd"))
+sd_real_tidy = select(data_cuantitativa, -ends_with("count"), -ends_with("mean"))
+
+
+chart.Correlation(mean_real_tidy, histogram=TRUE, pch=19)
+chart.Correlation(sd_real_tidy, histogram=TRUE, pch=19)
+
+
+Wt = t(mean_real_tidy)-colMeans(mean_real_tidy)
+Wt %*% t(Wt)/(n-1)
+
+  ggplot(data_cualitativa)+
+  geom_bar(mapping = aes(x=ICUType,fill= Gender), position = "dodge")+
+  labs(title = "UCI/Genero\n", x = "Tipo UCI", y = "Counts", fill = "Genero") +
+  scale_fill_manual(labels = c("Mujer", "Homber"), values = c("hotpink2", "dodgerblue3")) 
+
+  ggplot(data_cualitativa)+
+  geom_bar(mapping = aes(x=ICUType,fill= `In-hospital_death`), position = "dodge")+
+  labs(title = "UCI/Muerte\n", x = "Tipo UCI", y = "Counts", fill = "Muertos en el hospital") +
+  scale_fill_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
+  
+  ggplot(data_cualitativa)+
+  geom_bar(mapping = aes(x=Gender,fill= `In-hospital_death`), position = "dodge")+
+  labs(title = "Muerte/Genero\n", x = "Genero", y = "Counts", fill = "Muertos en el hospital") +
+   scale_fill_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
+  
+  
+  
+
 ```
+
+Gráfico1: Vemos que la distribución de los pacientes respecto al tipo de UCI es que la Uci tipo 3 tiene más pacientes que las demás y que en todos los tipos hay más hombres que mujeres
+
+Gráfico2: En el gráfico 1 los pacientes de la UCI 2 so mas que los pacientes de la UCI 1, pero en cambio vemos que hay menos muerte en UCI 2 que en UCI 1. Esto puede significar menor probabilidad de muerte en la UCI 2.
+
+Gráfico3: Hay mas población de hombres que de mujeres pero las muertes se reparten de forma equitativa.
+
+```{r}
+contar_sofa= function(data){
+  a=c(rep(0,25))
+  b=c(rep(0,25))
+for (i in 1:length(a)){
+  a[i]=nrow(filter(data,SOFA==i-1))
+  b[i]=nrow(filter(data,(SOFA==i-1)&(`In-hospital_death`==1)))
+}
+  return((b/a)*100)
+}
+a= contar_sofa(data_real_tidy)
+demo=tribble(
+    ~SOFA,   ~propor,
+    0,        a[1],
+    1,        a[2],
+    2,        a[3],
+    3,        a[4],
+    4,        a[5],
+    5,        a[6],
+    6,        a[7],
+    7,        a[8],
+    8,        a[9],
+    9,        a[10],
+    10,        a[11],
+    11,        a[12],
+    12,        a[13],
+    13,        a[14],
+    14,        a[15],
+    15,        a[16],
+    16,        a[17],
+    17,        a[18],
+    18,        a[19],
+    19,        a[20],
+    20,        a[21],
+    21,        a[22],
+    22,        a[23],
+    23,        a[24],
+    24,        a[25]
+)
+  demo$SOFA= as.factor(demo$SOFA)
+  demo$propor= as.factor(demo$propor)
+  ggplot(demo)+
+  geom_bar(mapping = aes(x=SOFA,y=propor), stat = "identity")
+
+  ggplot(data_real_tidy)+
+  geom_bar(mapping = aes(x=SOFA,fill= `In-hospital_death`), position = "dodge")+
+  labs(title = "SOFA/Muertes\n", x = "SOFA", y = "Counts", fill = "Muertos en el hospital") +
+   scale_fill_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
+
+  ggplot(data_real_tidy)+
+  geom_bar(mapping = aes(x=`SAPS-I`,fill= `In-hospital_death`), position = "dodge")+
+  labs(title = "SAPS-I/Muertes\n", x = "SAPS-I", y = "Counts", fill = "Muertos en el hospital") +
+   scale_fill_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
+  
+    ggplot(data_real_tidy)+
+  geom_point(mapping = aes(x=Urine_mean,y=Urine_count,color= `In-hospital_death`))+
+  labs(title = "Urine/Muertes\n", x = "Urine_mean", y = "Urine_count", color = "Muertos en el hospital") +
+   scale_color_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
+    
+    ggplot(data_real_tidy)+
+  geom_point(mapping = aes(x=BUN_mean,y=BUN_count,color= `In-hospital_death`),position = "jitter")+
+  labs(title = "BUN/Muertes\n", x = "Genero", y = "Counts", color = "Muertos en el hospital") +
+   scale_color_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
+    
+    ggplot(data_real_tidy)+
+  geom_point(mapping = aes(x=GCS_mean,y=GCS_count,color= `In-hospital_death`),position = "jitter")+
+  labs(title = "Muerte/Genero\n", x = "Genero", y = "Counts", color = "Muertos en el hospital") +
+   scale_color_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
+    
+    ggplot(data_real_tidy)+
+  geom_point(mapping = aes(x=Creatinine_mean,y=Creatinine_count,color= `In-hospital_death`),position = "jitter")+
+  labs(title = "Muerte/Genero\n", x = "Genero", y = "Counts", color = "Muertos en el hospital") +
+   scale_color_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
+    
+  ggplot(data_real_tidy)+
+  geom_point(mapping = aes(x=HCO3_mean,y=HCO3_count,color= `In-hospital_death`),position = "jitter")+
+  labs(title = "Muerte/Genero\n", x = "Genero", y = "Counts", color = "Muertos en el hospital") +
+   scale_color_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
+    
+```
+
+Las variables SOFA y SAPS-I son variables discretas y podemos usar geom_bar() para representarlas mediante histogramas. Pero las variables que hemos escogido son continuas y geom_bar() necesita que sean variables discretas, hemos decidido usar geom_point() para dibujar las muertes respecto de cada variable en el plano. 
+
+
 
