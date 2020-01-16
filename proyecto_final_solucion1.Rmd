@@ -31,6 +31,13 @@ library("aplpack")
 # Para el ACP
 library("factoextra")
 library("ggfortify")
+
+# Para el escalamiento multidimensional y la distancia de Gower
+library("StatMatch")
+library("philentropy")
+
+# Para el clustering
+library("cluster")
 ```
 
 # Introducción: Physionet 2012 UCI data mortality
@@ -72,38 +79,37 @@ lista_pacientes_set_a[1]
 ```
 ## Descripción de las variables
 
-- `Edad`
+- `Age`: Edad del paciente en años ($64.5 \pm 17.1$) (Dato cuantitativo)
 
-- `Género`
+- `Gender`: Sexo del paciente ($0$-Mujer, $1$-Hombre): $43.8%$ M y $56.2%$ H) (Dato cualitativo)
 
-- `Tipo UCI`
+- `ICUType`: Tipo de UCI (Dato cualitativo)
+  
+  - UCI 1 : Cuidados coronarios ($21.1%$)
+  
+  - UCI 2 : Recuperación cardíaca ($21.1$)
+  
+  - UCI 3 : Médica ($35.8%$)
+  
+  - UCI 4 : Cirugía ($28.4%$)
 
-- `SAPSI` ("Simplified Acute Physiology Score" estima la probabilitat de mortalitat del pacient d'UCI.)
+- `SAPSI` : "Simplified Acute Physiology Score" estima la probabilidad de mortalidad del paciente de la UCI. $14.9 \pm 5.2$ (Mal $> 17$) (Dato cuantitativo)
 
-- `SOFA` ("Sequential Organ Failure Assessment"  Es utilizado para seguir el estado del paciente durante su estadía en la Unidad de UC.)
+- `SOFA` : "Sequential Organ Failure Assessment"  Es utilizado para seguir el estado del paciente durante su estadía en la Unidad de UCI. ($6.4 \pm 4.2$) (Dato cuantitativo)
 
-- `LOS`
+- `LOS`: "Length of Stay" ($13.4 \pm 12.8$) (Seguimiento máx dos años) (Dato cuantitativo)
 
-- `Survival`
+- `Survival`: Días de supervivencia en el hospital ($133.9 \pm 372.7$) (Dato cuantitativo)
 
-- `In-hospital-death`
+- `In-hospital-death`: Se indica mediante dos valores si el paciente consigue sobrevivir o no en el hospital ($0$-vive, $1$-murió en el hospital) (Dato cualitativo)
 
-
-```
-data_paciente_132539=read_csv("data_basic_physionet/set-a/132539.txt", col_types =cols(Time=col_time(format="%M:%S"),Parameter=col_character(),
-Value=col_double()))
-str(data_paciente_132539)
-glimpse(data_paciente_132539)
-class(data_paciente_132539)
-head(data_paciente_132539,30)
-```
 
 ## Carga set_a
 
 ```{r}
-# lista path's  a cada  ficjero de paciente
+# Pegamos la lista path's a cada fichero de paciente
 list_files = paste0(path,lista_pacientes_set_a)
-# Función leer paciente
+
 # Leemos el tiempo como carácter y después haremos un ajuste que nos lo simplifique todo a minutos.  
 leer_paciente = function(file){read_csv(file, col_types = cols(Time = col_character(),
                                                                Parameter = col_character(),
@@ -111,10 +117,9 @@ leer_paciente = function(file){read_csv(file, col_types = cols(Time = col_charac
 # Separamos las horas de los minutos de la columna Time para acto seguido poner una sola columna 
 # llamada Time_min sólo con los minutos en que se tomaron los datos.
                               separate(Time,into = c("H","M"),sep = ":") %>% 
-                              mutate(Time_Minutes = as.numeric(H)*60+as.numeric(M)) %>% 
+                              mutate(Time_Minutes = as.numeric(H)*60 + as.numeric(M)) %>% 
                               select(Time_Minutes,Parameter,Value)}
 
-#leer_paciente(list_files[1])
 
 raw_data = lapply(list_files,leer_paciente) # lista de los datos por paciente
 
@@ -125,9 +130,8 @@ perfil = function(data_paciente){
             select(-Time_Minutes) %>%
             distinct(Parameter,.keep_all = TRUE) %>%
             spread(Parameter,Value) }
-## ejemplo
-#perfil(data_paciente_132539)
-## Guardo  todos los datos  del perfil de cada paciente
+
+# Guardo  todos los datos  del perfil de cada paciente
 perfiles =  lapply(raw_data,perfil) %>%
             bind_rows() %>%
             select(RecordID, Age, Gender, Height,Weight,ICUType)
@@ -136,25 +140,30 @@ glimpse(perfiles) # Printamos la funcion
 
 # Arreglamos el error de time
 serie_UCI_parameter <- function(paciente,parameters){ paciente %>%
+                                                      # Ordenamos por tiempo
                                                       arrange(Parameter,Time_Minutes) %>%
+                                                      # Variables que queremos en la tabla (las que no pongamos desaparecen)
                                                       filter(Parameter %in% parameters) %>%
+                                                      # Añadimos la variable RecordID que recoja el ID del paciente
                                                       add_column(RecordID = paciente[1,3]$Value) } 
-##ejemplo
+##ejemplo con solo 3 parametros
 parameters = c("HR","RespRate","GCS")
+
 serie_paciente1 = serie_UCI_parameter(raw_data[[1]],parameters)
 serie_paciente1
-# paso TODOS los parámetros y  apilo 
-parameters=c("Albumin","ALP","ALT","AST","Bilirubin","BUN","Cholesterol","Creatinine","DiasABP","FiO2","GCS","Glucose","HCO3","HCT","HR","K","Lactate","Mg","MAP","MechVent","Na","NIDiasABP","NIMAP","NISysABP","PaCO2","PaO2","pH","Platelets","RespRate","SaO2","SysABP","Temp","TropI","TropT","Urine","WBC")
-series_parameters = lapply(raw_data,FUN=function(x) serie_UCI_parameter(x,parameters)) %>%
-                    bind_rows()
+
+# paso TODOS los parámetros y apilo (no introducimos RecordID ya que lo hemos convertido en columna y no como dato de la fila Parameter)
+parameters = c("Albumin","ALP","ALT","AST","Bilirubin","BUN","Cholesterol","Creatinine","DiasABP","FiO2","GCS","Glucose","HCO3","HCT","HR","K","Lactate","Mg","MAP","MechVent","Na","NIDiasABP","NIMAP","NISysABP","PaCO2","PaO2","pH","Platelets","RespRate","SaO2","SysABP","Temp","TropI","TropT","Urine","WBC")
+
+# Mediante la función lapply aplicamos a todo el dataset raw_data la función anterior
+series_parameters = lapply(raw_data, FUN = function(x) serie_UCI_parameter(x,parameters)) %>%
+                    bind_rows() # No lo junte todo en un mismo data y esten todos los datos juntos en filas
 
 glimpse(series_parameters) # Printamos la función
 ```
 
 
-
-
-## En resumen  tenemos
+## En resumen tenemos
 
 ```{r}
 #set-a
@@ -166,14 +175,15 @@ glimpse(series_parameters)
 
 ## Unificar: series, perfiles y scores
 
-Nos faltan los scores clásicos que se utilizan eb las ICU. Estos ewstán el fichero Outcome-a.txt para el set-a
-
+Nos faltan los scores clásicos que se utilizan en las UCI's. Estos esstán el fichero Outcome-a.txt para el set-a.
 
 
 ```{r}
+# Leemos fichero
 scoresApath = "data_basic_physionet/Outcomes-a.txt"
 scoresA = read_csv(scoresApath)
 glimpse(scoresA)
+# Juntamos dos tablas
 Scores_perfilesA = inner_join(perfiles,scoresA,"RecordID")
 glimpse(Scores_perfilesA)
 ```
@@ -181,25 +191,40 @@ glimpse(Scores_perfilesA)
 
 ### Extracción factores de las series 
 
-genero una tabla con resumenes de  las variables por paciente: media, desviación típica 
+Generamos una tabla con resúmenes de las variables por paciente: media y desviación típica 
 
 ```{r}
+# 
+
 series_summary =  series_parameters %>%
                   group_by(RecordID,Parameter) %>%
                   summarise(count = n(),mean = mean(Value,na.rm = TRUE),
                             sd = sd(Value,na.rm=TRUE)) %>%
+                  # Creamos la columna Stat, llena de count's y en Value indicamos el número de veces que se toma la observación
                   gather(Stat, Value, count:sd) %>%
+                  # Deshacemos la agrupación que habíamos hecho
                   ungroup() %>%
-                  transmute(RecordID,ParameterStat = paste0(Parameter,"_",Stat),Value) %>%
+                  # Guardamos sólo los parámetros que le indicamos
+                  transmute(RecordID, ParameterStat = paste0(Parameter,"_",Stat), Value) %>%
+                  # Las variables de Parameter las convertimos en columnas, i.e, parámetros
                   spread(ParameterStat, Value)
+
+series_summary
 ```
 
+Ahora ya podemos crear la primera versión de la tabla de datos juntando los perfiles y las variables básicas.
 
 ```{r}
 data_tidy = Scores_perfilesA %>% inner_join(series_summary)
+
+head(data_tidy) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+  scroll_box(width = "910px")
+
 ```
 
-## LIMPIEZA NA's
+## Limpieza de los NA's
 
 Si quisiéramos limpiar los NA's de una variable cualquiera, por ejemplo `Lactate_count`, podríamos realizar las siguientes instrucciones en R:
 
@@ -243,32 +268,43 @@ pocos_nas = function(x){
     }
   }
 }
-
-
-#Aplicamos la función de TRUE o FALSE para saber qué variables pasan el umbral de 1500 NA's y cuáles no
-seleccion_pocos_nas = data_tidy %>%
-  apply( 2, pocos_nas)
-
-
-# Guardamos sólo los nombres de las variables que en "<VARIABLE>_count" está por debajo los 1500 NA's
-nombres = names(seleccion_pocos_nas[seleccion_pocos_nas])
-nombres
-
-#Guardamos en un data set nuevo las variables que nos ha interesado seleccionar con el criterio de NA's
-primera_seleccion = select(data_tidy, nombres)
-
 ```
 
-## SELECCIÓN 10 VARIABLES INICIALES
+
+Aplicamos la función de TRUE o FALSE para saber qué variables pasan el umbral de 1500 NA's y cuáles no
+
+```{r}
+seleccion_pocos_nas = data_tidy %>%
+  apply( 2, pocos_nas) #apply(2,) signifiac aplicar la función en las columnas
+```
+
+Guardamos sólo los nombres de las variables que en "<VARIABLE>_count" está por debajo los 1500 NA's
+
+```{r}
+nombres = names(seleccion_pocos_nas[seleccion_pocos_nas])
+nombres
+```
+
+Guardamos en un data set nuevo las variables que nos ha interesado seleccionar con el criterio de NA's
+
+```{r}
+primera_seleccion = select(data_tidy, nombres)
+```
+
+## Selección de las 10 variables iniciales
 
 El criterio de primera selección se basará en considerar las que tengan menos NA's como las más útiles para nuestro estudio.
 
+De las seleccionadas, miramos las que tienen menos NA's y las reordenamos para elegir las 10 primeras. Para hacerlo nos fijamos sólo en las variables: "<VARIABLE>_sd" mediante un select:
+
 ```{r}
-# DE LAS SELECCIONADAS, MIRAMOS LAS QUE TIENEN MENOS NA'S Y LAS REORDENAMOS PARA ELEGIR LAS 10 PRIMERAS
-# Para hacerlo nos fijamos sólo en las variables: "<VARIABLE>_sd" mediante un select
 seleccion_menor_nas = select(primera_seleccion, ends_with("sd")) %>% apply(2, contar_nas)
 seleccion_menor_nas
+```
 
+Las reordenamos para poder coger sólo las 10 primeras
+
+```{r}
 # LAS REORDENAMOS PARA PODER COGER SÓLO LAS 10 PRIMERAS
 nombres_pocos_nas = sort(seleccion_menor_nas)
 nombres_pocos_nas
@@ -276,22 +312,27 @@ nombres_pocos_nas
 # COGEMOS LAS 10 PRIMERAS
 nombres_def = nombres_pocos_nas[1:10]
 nombres_def
+```
 
-# DE FORMA MANUAL, VOLVEMOS AL DATA SET ORIGINAL Y SELECCIONAMOS LAS 10 VARIABLES DE "nombres_def"
+De forma manual, volvemos al data ser original y seleccionamos las 10 variables de "nombre_def"
+
+```{r}
 data_real_tidy = select(data_tidy, contains("RecordID"),  contains("Age"),  contains("Gender"),  contains("Height"),  contains("Weight"),  contains("ICUType"),  contains("SAPS-I"),  contains("SOFA"),  contains("Length_of_stay"),  contains("Survival"),  contains("In-hospital_death"), contains("HR"), contains("Temp"), contains("GCS"), contains("Creatinine"),  contains("BUN"),  contains("Urine"),  contains("HCT"),  contains("HCO3"),  contains("Platelets"),  contains("WBC"))
+```
 
-# Eliminamos los na's que todavía hay y vemos que esta vez no desaparecen todos los datos, 
-# así pues habremos hecho una limpieza que habrá merecido la pena :)
+Eliminamos los na's que todavía hay y vemos que esta vez no desaparecen todos los datos, así pues habremos hecho una limpieza que habrá merecido la pena :)
+
+```{r}
 drop_na(data_real_tidy)
 ```
 
-## SELECCIÓN 5 VARIABLES
+## Selección de las 5 variables
 
 Para elegir las 5 que nos aporten mas información a la hora de predecir las muertes, realizamos los siguientes boxplots y contrastes de hipótesis para encontrar aquellas que la muerte y la vida tengan más variación.
 
+Definimos una función para el contraste de hipótesis para saber si deberiamos considerar las varianzas iguales o diferentes para el contraste de medias que haremos a continuación.
+
 ```{r, warning = FALSE}
-# Hacemos contraste de hipótesis para saber si deberiamos considerar las
-# varianzas iguales o diferentes para el contraste de medias que haremos a continuación.
 test_varianzas = function(columna){
   # hip nula : varianzas iguales
   # hip alternativa : diferentes 
@@ -305,8 +346,11 @@ test_varianzas = function(columna){
     return(TRUE)
   }
 }
+```
 
-# Hacemos contraste de hipótesis para saber si las medias son iguales o no.
+Definimos una función para el contraste de hipótesis para saber si las medias son iguales o no.
+
+```{r, warning = FALSE}
 test_medias = function(columna){
   # hip nula : medias son iguales 
   # hip alternativa: se indica en alternative = c("two.sided", "less", "greater")
@@ -315,7 +359,11 @@ test_medias = function(columna){
              var.equal = test_varianzas(columna)) # Aquí aplicamos la función anterior como habíamos dicho
   return(x$p.value)
 }
+```
 
+Definimos la función que nos dará por escrito el resultado de los contrastes
+
+```{r, warning = FALSE}
 respuesta_test = function(columna){
   x = t.test(columna[data_real_tidy$`In-hospital_death` == 0],
              columna[data_real_tidy$`In-hospital_death` == 1],
@@ -328,9 +376,12 @@ respuesta_test = function(columna){
     print('Aceptamos: Las medias son iguales <-')
   }
 }
+```
 
+Empezamos los boxplot de las 10 variables
 
-# SELECCIÓN 5 VARIABLES MÁS RELEVANTES PARA PREDECIR LA MUERTE
+```{r, warning = FALSE}
+
 # Para que podamos hacer los boxplot bien, antes debemos hacer factor la columna de "Muertes en el hospital"
 data_real_tidy$`In-hospital_death` = as.factor(data_real_tidy$`In-hospital_death`)
 # Creamos un array "vacio" que contendrá los valores del p.value del test de medias
@@ -342,14 +393,19 @@ p1 <- data_real_tidy %>%
   geom_boxplot(aes( x = `In-hospital_death`, y = HR_mean)) +
   labs(x = " vive | muere", y = "Latido corazon")
 
-
 # Hacemos el test de medias de cada una de las variables
 print("Variable: LATIDO CORAZÓN")
+
 # Guardamos el p_valor para más tarde considerar las 5 mejores como aquellas con el p_valor más bajo
 p_valores[1] = test_medias(data_real_tidy$HR_mean)
+
 # Imprimimos por pantalla la resolución del test de medias (teniendo el de varianzas ya resuelto dentro del de medias)
 respuesta_test(data_real_tidy$HR_mean)
+```
 
+Para las siguientes 9 variables, el codigo es análogo. Sólo mostraremos lo que sale por pantalla
+
+```{r, echo = FALSE, warning = FALSE}
 # TEMPERATURA ----------------------------------------------------------------------------
 p2 <- data_real_tidy %>%
   ggplot() +
@@ -410,13 +466,13 @@ print("Variable: HEMATOCRITO")
 p_valores[7] = test_medias(data_real_tidy$HCT_mean) # Se acepta que las medias son iguales, así HTC no nos interesa
 respuesta_test(data_real_tidy$HCT_mean)
 
-# SERUM BICARBONADO ----------------------------------------------------------------------
+# BICARBONATO ----------------------------------------------------------------------------
 p8 <- data_real_tidy %>%
   ggplot() +
   geom_boxplot(aes( x = `In-hospital_death`, y = HCO3_mean)) +
-  labs(x = " vive | muere", y = "Serum bicarbonado")
+  labs(x = " vive | muere", y = "Bicarbonato")
 
-print("Variable: SERUM BICARBONADO")
+print("Variable: BICARBONATO")
 p_valores[8] = test_medias(data_real_tidy$HCO3_mean)
 respuesta_test(data_real_tidy$HCO3_mean)
 
@@ -440,7 +496,11 @@ print("Variable: GLOBULOS BLANCOS EN SANGRE")
 p_valores[10] = test_medias(data_real_tidy$WBC_mean)
 respuesta_test(data_real_tidy$WBC_mean)
 
-# Imprimimos los boxplot de forma más compacta para ahorrar espacio
+```
+
+Imprimimos los boxplot de forma más compacta para ahorrar espacio:
+
+```{r, warning = FALSE}
 grid.arrange(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10, nrow = 2)
 
 ```
@@ -452,6 +512,7 @@ Lo que nos interesa ahora es coger de las que sí presentan diferencias, elegir 
 ```{r}
 # Creamos un array que nos guarde los nombres de las 10 variables con las que trabajamos
 diez_variables = names(select(data_real_tidy, ends_with("mean")))
+
 
 # Creamos una tibble que de cada variable nos diga su p-valor en el contraste de medias
 tabla_p_valores = as_tibble(data.frame(diez_variables, p_valores))
@@ -471,14 +532,18 @@ data_real_tidy = select(data_tidy, contains("RecordID"),  contains("Age"),  cont
 
 # Volvemos a hacer factor el `In-hospital_death`
 data_real_tidy$`In-hospital_death` = as.factor(data_real_tidy$`In-hospital_death`)
+data_real_tidy$Gender = as.factor(data_real_tidy$Gender)
 
 # Vemos que hay dos pacientes que por error su género se indica como -1, así pues, quitamos estas filas
 data_real_tidy = filter(data_real_tidy,Gender != -1)
 # Quitamos los NA's que hayan podido quedar
 data_real_tidy = drop_na(data_real_tidy)
 
+```
 
-# Mostramos por pantalla la tabla final
+Mostramos por pantalla la tabla final
+
+```{r}
 head(data_real_tidy) %>%
   kable() %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
@@ -488,54 +553,61 @@ head(data_real_tidy) %>%
 
 ## Descripción de las cinco variables seleccionadas
 
-- `GCS` (Glasgow): 
+- `GCS` (Escala Glasgow): Mide el estado de alerta del paciente en casos de traumatismo craneoencefálico (valores entre $3-15$, recomendable entre $3$ y $8$)
 
-- `BUN` (Nitrógeno en sangre):
+- `BUN` (Nitrógeno en sangre, mg/dL): Inidicativos de la función renal (recomendable: entre $8 - 20 mg/dL$)
 
-- `HCO3` (Serum bicarbonado):
+- `HCO3` (Bicarbonato, mmol/L): Presente en las gasometrías (recomendable: entre $22 - 28$ mEq/L)
 
-- `Creatinine` (Creatinina):
+- `Creatinine` (Creatinina, mg/dL): Sirve para saber qué tan bien funcionan los riñones (recomendable: entre $0.7 - 1.3$ mg/dL)
 
-- `Urine` (orina):
+- `Urine` (Orina, mL): Medición de la orina.
 
 
 
 # Análisis descriptivo multivariado
 
-## Histogramas entre las variables cualitativas
+Ahora que ya tenemos la tabla final de datos con los que vamos a trabajar, empezamos el estudio descriptivo de las variables cualitativas y cuantitativas.
 
+## Histogramas entre las variables cualitativas
 
 ```{r, fig.width=10, fig.height=6}
 
 n = nrow(data_real_tidy)
 
+# Seleccionamos sólo las variables cualitativas
 data_cualitativa = select(data_real_tidy,Gender, ICUType, `In-hospital_death`)
+# Seleccionamos sólo las variables cuantitativas
 data_cuantitativa = select(data_real_tidy, -RecordID, -Gender, -ICUType, -`In-hospital_death`)
-data_cualitativa$Gender = as_factor(data_cualitativa$Gender)
-
-
-  ggplot(data_cualitativa)+
-  geom_bar(mapping = aes(x=ICUType,fill= Gender), position = "dodge")+
-  labs(title = "UCI/Genero\n", x = "Tipo UCI", y = "Counts", fill = "Genero") +
-  scale_fill_manual(labels = c("Mujer", "Homber"), values = c("hotpink2", "dodgerblue3")) 
-
-  ggplot(data_cualitativa)+
-  geom_bar(mapping = aes(x=ICUType,fill= `In-hospital_death`), position = "dodge")+
-  labs(title = "UCI/Muerte\n", x = "Tipo UCI", y = "Counts", fill = "Muertos en el hospital") +
-  scale_fill_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
-  
-  ggplot(data_cualitativa)+
-  geom_bar(mapping = aes(x=Gender,fill= `In-hospital_death`), position = "dodge")+
-  labs(title = "Muerte/Genero\n", x = "Genero", y = "Counts", fill = "Muertos en el hospital") +
-   scale_fill_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
-  
-  
 
 ```
 
+```{r}
+ggplot(data_cualitativa)+
+  geom_bar(mapping = aes(x=ICUType,fill= Gender), position = "dodge")+
+  labs(title = "UCI/Genero\n", x = "Tipo UCI", y = "Counts", fill = "Genero") +
+  scale_fill_manual(labels = c("Mujer", "Homber"), values = c("hotpink2", "dodgerblue3")) 
+```
+
+
 - **Gráfico1**: Vemos que la distribución de los pacientes respecto al tipo de UCI es que la Uci tipo 3 tiene más pacientes que las demás y que en todos los tipos hay más hombres que mujeres
 
+```{r}
+ggplot(data_cualitativa)+
+  geom_bar(mapping = aes(x=ICUType,fill= `In-hospital_death`), position = "dodge")+
+  labs(title = "UCI/Muerte\n", x = "Tipo UCI", y = "Counts", fill = "Muertos en el hospital") +
+  scale_fill_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
+```
+
+
 - **Gráfico2**: En el gráfico 1 los pacientes de la UCI 2 so mas que los pacientes de la UCI 1, pero en cambio vemos que hay menos muerte en UCI 2 que en UCI 1. Esto puede significar menor probabilidad de muerte en la UCI 2.
+
+```{r}
+ggplot(data_cualitativa)+
+  geom_bar(mapping = aes(x=Gender,fill= `In-hospital_death`), position = "dodge")+
+  labs(title = "Muerte/Genero\n", x = "Genero", y = "Counts", fill = "Muertos en el hospital") +
+   scale_fill_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
+```
 
 - **Gráfico3**: Hay mas población de hombres que de mujeres pero las muertes se reparten de forma equitativa.
 
@@ -557,61 +629,124 @@ for (i in 1:25){
   return((b/a)*100)
 }
 
-
+# Tabla con la proporción de muertes para los diferentes niveles de SOFA
 muertes_cond_SOFA = tibble(SOFA = as.factor(c(0:24)), Proporcion = as.factor(contar_sofa(data_real_tidy)))
 muertes_cond_SOFA
-
-
-  ggplot(muertes_cond_SOFA) +
-  geom_bar(mapping = aes(x = SOFA, y = Proporcion), stat = "identity")
-
-  
-  ggplot(data_real_tidy)+
-  geom_bar(mapping = aes(x = SOFA, fill = `In-hospital_death`), position = "dodge")+
-  labs(title = "SOFA/Muertes\n", x = "SOFA", y = "Counts", fill = "Muertos en el hospital") +
-   scale_fill_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
-
-  ggplot(data_real_tidy)+
-  geom_bar(mapping = aes(x = `SAPS-I`, fill = `In-hospital_death`), position = "dodge")+
-  labs(title = "SAPS-I/Muertes\n", x = "SAPS-I", y = "Counts", fill = "Muertos en el hospital") +
-   scale_fill_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
-  
-  ggplot(data_real_tidy)+
-  geom_bar(mapping = aes(x=`SAPS-I`,fill= `In-hospital_death`), position = "dodge")+
-  labs(title = "SAPS-I/Muertes\n", x = "SAPS-I", y = "Counts", fill = "Muertos en el hospital") +
-   scale_fill_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
-  
-    ggplot(data_real_tidy)+
-  geom_point(mapping = aes(x=Urine_mean,y=Urine_count,color= `In-hospital_death`))+
-  labs(title = "Urine/Muertes\n", x = "Urine_mean", y = "Urine_count", color = "Muertos en el hospital") +
-   scale_color_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
-    
-    ggplot(data_real_tidy)+
-  geom_point(mapping = aes(x=BUN_mean,y=BUN_count,color= `In-hospital_death`),position = "jitter")+
-  labs(title = "BUN/Muertes\n", x = "Genero", y = "Counts", color = "Muertos en el hospital") +
-   scale_color_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
-    
-    ggplot(data_real_tidy)+
-  geom_point(mapping = aes(x=GCS_mean,y=GCS_count,color= `In-hospital_death`),position = "jitter")+
-  labs(title = "Muerte/Genero\n", x = "Genero", y = "Counts", color = "Muertos en el hospital") +
-   scale_color_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
-    
-    ggplot(data_real_tidy)+
-  geom_point(mapping = aes(x=Creatinine_mean,y=Creatinine_count,color= `In-hospital_death`),position = "jitter")+
-  labs(title = "Muerte/Genero\n", x = "Genero", y = "Counts", color = "Muertos en el hospital") +
-   scale_color_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
-    
-  ggplot(data_real_tidy)+
-  geom_point(mapping = aes(x=HCO3_mean,y=HCO3_count,color= `In-hospital_death`),position = "jitter")+
-  labs(title = "Muerte/Genero\n", x = "Genero", y = "Counts", color = "Muertos en el hospital") +
-   scale_color_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
 ```
 
 Las variables SOFA y SAPS-I son variables discretas y podemos usar geom_bar() para representarlas mediante histogramas. Pero las variables que hemos escogido son continuas y geom_bar() necesita que sean variables discretas, hemos decidido usar geom_point() para dibujar las muertes respecto de cada variable en el plano. 
 
+```{r}
+  ggplot(muertes_cond_SOFA) +
+  geom_bar(mapping = aes(x = SOFA, y = Proporcion), stat = "identity")
+```  
+
+La interpretación del gráfico sería que hasta el índice 11 no vemos relación directa para predecir la mortalidad, pero a partir del índice 12 vemos bastante relación directa con la muerte del paciente.
+
+```{r}
+  ggplot(data_real_tidy)+
+  geom_bar(mapping = aes(x = SOFA, fill = `In-hospital_death`), position = "dodge")+
+  labs(title = "SOFA/Muertes\n", x = "SOFA", y = "Numero pacientes", fill = "Muertos en el hospital") +
+   scale_fill_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
+```
+
+La mayoría de pacientes que sobreviven tienen su índice entre 3 y 15 (aproximadamente)
+
+```{r}
+  ggplot(data_real_tidy)+
+  geom_bar(mapping = aes(x = `SAPS-I`, fill = `In-hospital_death`), position = "dodge")+
+  labs(title = "SAPS-I/Muertes\n", x = "SAPS-I", y = "Numero pacientes", fill = "Muertos en el hospital") +
+   scale_fill_manual(labels = c("Vida", "Muerte"), values = c("khaki3", "gray48"))
+```
+
+De igual manera podemos hacerlo para el `SAPS-I`. Los que más sobreviven tienen su índice en los valores más intermedios.
+
+```{r}
+grid.arrange(p3,p4,p5,p6,p8, nrow = 1)
+```
+
+
+
+- En el primer gráfico vemos que de media, las personas que mueren tienen el Glasgow mas bajo que las personas que viven.
+
+- Si miramos el siguiente gráfico, los que mueren tienen la creatinina mas alta de media que los que viven, aunque hay muchos outliers de personas con la creatinina alta y que sobrevivieron.
+
+- En el tercer gráfico, podemos ver que sigue la misma estructura que el gráfico anterior
+
+- Del cuarto gráfico vemos que los que mueren tienen la orina mas baja que los que viven.
+
+- Por último, en el gráfico del bicarbonato vemos bastantes outliers tanto por arriba como por abajo y los que mueren de media tienen el bicarbonato más bajo.
+
+
 ## ¿El tipo de UCI marca muchas diferencias respecto el nivel de mortalidad?
 
-Sin hacer :D
+```{r}
+data_real_tidy %>%
+  group_by(ICUType) %>%
+  ggplot(mapping = aes(x=`In-hospital_death`,y=Urine_mean))+
+  geom_boxplot()+
+  facet_wrap(~ICUType,nrow=1) + 
+  labs(x = "0 : vive | 1 : muere", y = "Orina")
+```
+
+```{r, echo = FALSE}
+data_real_tidy %>%
+  group_by(ICUType) %>%
+  ggplot(mapping = aes(x=`In-hospital_death`,y=Creatinine_mean))+
+  geom_boxplot()+
+  facet_wrap(~ICUType,nrow=1)+ 
+  labs(x = "0 : vive | 1 : muere", y = "Creatinina")
+
+data_real_tidy %>%
+  group_by(ICUType) %>%
+  ggplot(mapping = aes(x=`In-hospital_death`,y=GCS_mean))+
+  geom_boxplot()+
+  facet_wrap(~ICUType,nrow=1)+ 
+  labs(x = "0 : vive | 1 : muere", y = "Glasgow")
+```
+
+```{r}
+data_real_tidy %>%
+  group_by(ICUType) %>%
+  ggplot(mapping = aes(x=`In-hospital_death`,y=BUN_mean))+
+  geom_boxplot()+
+  facet_wrap(~ICUType,nrow=1)+ 
+  labs(x = "0 : vive | 1 : muere", y = "Nitrogeno en sangre")
+```
+
+```{r, echo = FALSE}
+data_real_tidy %>%
+  group_by(ICUType) %>%
+  ggplot(mapping = aes(x=`In-hospital_death`,y=HCO3_mean))+
+  geom_boxplot()+
+  facet_wrap(~ICUType,nrow=1)+ 
+  labs(x = "0 : vive | 1 : muere", y = "Bicarbonato")
+```
+
+No visualizamos cambios importantes entre las diferentes UCI's. Así pues, no vemos necesidad en hacer distinción de UCI en el posterior estudio estadístico multivariacional. 
+
+```{r}
+data_real_tidy %>%
+  group_by(ICUType) %>%
+  ggplot(mapping = aes(x=`In-hospital_death`,y=SOFA))+
+  geom_jitter()+
+  facet_wrap(~ICUType,nrow=1)+ 
+  labs(x = "0 : vive | 1 : muere", y = "SOFA")
+```
+
+Los cuidados en las diferentes UCI's dan más casos positivos en la supervivencia del paciente. Por ejemplo, en la cirugía cardíaca (UCI 2), los casos que han tenido el SOFA entre 5 y 13 han sobrevivido y en el los Cuidados Coronarios (UCI 1), los valores donde más se ha sobrevivido son más bajos.
+
+```{r}
+data_real_tidy %>%
+  group_by(ICUType) %>%
+  ggplot(mapping = aes(x=`In-hospital_death`,y=`SAPS-I`))+
+  geom_jitter()+
+  facet_wrap(~ICUType,nrow=1)+ 
+  labs(x = "0 : vive | 1 : muere", y = "SAPS-I")
+```
+
+En este caso se añade que el SAPS-I igual a cero también da más casos de supervivencia que de muerte.
+
 
 ## Correlación entre variables
 
@@ -621,21 +756,13 @@ A la hora de calcular las correlaciones entre las variables por ejemplo, al vari
 
 ```{r, fig.width=10, fig.height=6}
 
-data_cualitativa = select(data_real_tidy, Gender, ICUType, `In-hospital_death`)
-data_cuantitativa = select(data_real_tidy, -RecordID, -Gender, -ICUType, -`In-hospital_death`)
-
-
 # Para mayor facilidad en el calculo de correlacion
 mean_real_tidy = select(data_cuantitativa, -ends_with("count"), -ends_with("sd"))
-#sd_real_tidy = select(data_cuantitativa, -ends_with("count"), -ends_with("mean"))
 
-
+# Pritamos la gráfia de correlación
 chart.Correlation(mean_real_tidy, histogram = TRUE, pch=19)
-#chart.Correlation(sd_real_tidy, histogram = TRUE, pch=19)
 
-sapply(mean_real_tidy, function(x) sum(is.na(x)))
-
-
+# Y la matriz de varianzas covarianzas
 cov(mean_real_tidy)
 ```
 
@@ -653,11 +780,11 @@ Variables más correlacionadas negativamente (las variables correlacionadas crec
 - `SOFA` y `GCS`, con una covarianza de $-7.73$
 
 
-Si haciendo estas gráficas diferenciando por el tipo de UCI no notamos diferencias significativas con la conclusión que hayamos podido sacar juntando todas las UCIS no añadiremos notaciones.
+Si haciendo estas gráficas diferenciando por el tipo de UCI no notamos diferencias significativas con la conclusión que hayamos podido sacar juntando todas las UCIS no añadiremos notaciones. Recordemos que hasta ahora no hemos notado ninguna diferencia significativa.
 
 ### UCI 1 - Cuidados coronarios
 
-```{r, fig.width=10, fig.height=6}
+```{r, echo = FALSE, fig.width=10, fig.height=6}
 # Seleccionamos los datos cuantitativos de la UCI 1
 data_cuant1 = data_real_tidy %>% 
               filter(ICUType == 1) %>%
@@ -677,7 +804,7 @@ cov(mean_data1)
 
 ### UCI 2 - Recuperación cirugía cardíaca
 
-```{r, fig.width=10, fig.height=6}
+```{r, echo = FALSE,fig.width=10, fig.height=6}
 # Seleccionamos los datos cuantitativos de la UCI 1
 data_cuant2 = data_real_tidy %>% 
               filter(ICUType == 2) %>%
@@ -697,7 +824,7 @@ cov(mean_data2)
 
 ### UCI 3 - Medical UCI
 
-```{r, fig.width=10, fig.height=6}
+```{r,echo = FALSE,  fig.width=10, fig.height=6}
 # Seleccionamos los datos cuantitativos de la UCI 1
 data_cuant3 = data_real_tidy %>% 
               filter(ICUType == 3) %>%
@@ -717,7 +844,7 @@ cov(mean_data3)
 
 ### UCI 4 - Cirugía
 
-```{r, fig.width=10, fig.height=6}
+```{r,echo = FALSE,  fig.width=10, fig.height=6}
 # Seleccionamos los datos cuantitativos de la UCI 1
 data_cuant4 = data_real_tidy %>% 
               filter(ICUType == 4) %>%
@@ -741,9 +868,14 @@ Con esta información concluimos que al hacer ACP podremos reducir dimensionalid
 
 # Análisis analítico
 
+Exploramos las técnicas multivariadas para generar un índice de supervivencia a partir de los datos de perfil de admisión y de las 5 variables seleccionadas.
+
+
 ## Análisis de componetes principales
 
 Como ya hemos visto en las correlaciones, podremos reducir la dimensionalidad para poder realizar un ACP y así ver cuales son las componentes que más influyen en la mortalidad del paciente.
+
+Seleccionamos sólo los datos de la UCI 1 ya que con nuestros paquetes y funciones preferimos trabajar con conjuntos de datos más pequeños.
 
 ### UCI 1
 ```{r}
@@ -790,7 +922,7 @@ gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),repel = TRUE
 )
 ```
 
-Al ver que todo nos cuadra, decidimos hacer el ACP de dimensión 6.
+Al ver que todo nos cuadra, decidimos hacer el ACP de dimensión 6. Aún así, esta reducción no nos da un trabajo fácil y cómodo a la hora de hacer las impresiones de los datos.
 
 ```{r}
 fviz_pca_ind(mean_data1.acp,
@@ -808,8 +940,146 @@ col.ind = "#696969" # color para las observaciones
 data = filter(data_real_tidy, ICUType == 1)
 data
 
+## ERROR
 
 #autoplot(mean_data1.acp, data = filter(data_real_tidy, ICUType == 1), colour = data$`In-hospital_death`,
 #         loadings = TRUE, loadings.colour = 'blue', loadings.label = TRUE, loadings.label.size = 3)
 ```
+
+
+## Clustering para la mortalidad
+
+### Escalamiento multidimensional
+
+Obtenemos la distancia de Gower entre todas las variables, sean cuantitativas o cualitativas.
+
+El data set que usaremos aparecen las 5 variables sólo con el valor de "mean" y quitamos las variables de la altura y peso ya que hasta ahora no las hemos decidido usar para el estudio y preferimos evitar problemas con los datos perdidos indicados con -1.
+
+```{r}
+# Para trabajar con el paquete cluster, necesitamos pasar la tibble a data frame.
+# Además decidimos obviar las columnas count y sd de todas las variables
+data_cluster = as.data.frame(select(data_real_tidy,-RecordID, -Height, -Weight,-ends_with("count"), -ends_with("sd")))
+head(data_cluster,5)
+
+distancia = gower.dist(data_cluster)
+
+```
+
+### K-Medoids
+
+Decidimos no realizar el clustering por K-means ya que en las impresiones anteriores de los boxplot veíamos que todas las variables tenian un número elevado de outliers.
+
+De hecho, preferimos usar directamente CLARA en vez de K-medoids teniendo un data set tan grande.
+
+```{r}
+k_medoids = pam(x = head(data_cluster,50),k = 4,metric = "euclidean",stand = FALSE)
+
+# Si lo hacemos directamente con R sin especificar absolutamente nada, te hace 4 grupos pero para nada clasifica por UCI
+fviz_cluster(k_medoids,
+palette = c("#00AFBB", "#FC4E07","yellow", "green"), # color palette
+ellipse.type = "t", # Concentration ellipse
+repel = TRUE, # Avoid label overplotting (slow)
+ggtheme= theme_classic()
+)
+
+
+# Si probamos a hacer clara directamente por distancia euclidea, vemos que clasifica bastante mal cuando printamos la tabla siguiente
+clara = clara( x = head(data_cluster,100), 4, metric = "euclidean", stand = FALSE, samples = 5, pamLike = FALSE)
+table(head(data_cluster,100)$ICUType, clara$cluster)
+
+
+
+# Si probamos a usar las distancias gower que hemos calculado arriba, aunque no sabemos printarlo en gráfica de puntos
+clusters <- pam(x = as.data.frame(distancia), k = 4, diss = TRUE)
+head(clusters$clustering,10)
+```
+
+
+
+# Análisis discriminante
+
+## Primero separamos los datos por cada UCI y luego estudiamos la normalidad de las variables que hemos escogido para ver si aplicamos análisis discriminante lineal o cuadrático.
+```
+uci_type1 = filter(data_real_tidy, data_real_tidy$ICUType == 1)
+hola = c(3,7:8,11,13,16,19,22,25)
+
+#pintamos histogramas con las variables seleccionadas
+for (k in 1:9) {
+  j0 <- names(uci_type1[,hola])[k]
+  x0 <- seq(min(uci_type1[,hola][, k]), max(uci_type1[,hola][, k]), le = 50) 
+  for (i in 1:2) {
+    x <- uci_type1[,hola][uci_type1[,hola]$ 'In-hospital_death' == i-1, j0]
+    hist(x, proba = T, col = khaki3, main = paste("Muerte", i-1),
+    xlab = j0, breaks = 20)
+    lines(x0, dnorm(x0, mean(x), sd(x)), col = "red", lwd = 2)
+  }
+}
+
+# Representación de cuantiles normales de cada variable para la uci1
+for (k in 1:9) {
+  j0 <- names(uci_type1[,hola])[k]
+  x0 <- seq(min(uci_type1[,hola][, k]), max(uci_type1[,hola][, k]), le = 50) 
+  for (i in 1:2) {
+    x <- uci_type1[,hola][uci_type1[,hola]$ 'In-hospital_death' == i-1, j0]
+    qqnorm(x, main = paste(i-1, j0), pch = 19, col = i + 1)
+    qqline(x)
+  }
+}
+```
+
+Tests de Royston y Henz-Zirkler para ver normalidad multivariante
+```
+library(MVN)
+royston_test <- mvn(uci_type1[,hola], mvnTest = "royston", multivariatePlot = "qq")
+royston_test$multivariateNormality
+
+hz_test <- mvn(uci_type1[,hola], mvnTest = "hz")
+hz_test$multivariateNormality
+```
+
+Hacemos el test BoxM para ver si la matriz de covarianza es homogenea o no
+
+```
+library(biotools)
+boxM(data = uci_type1[,hola], grouping = uci_type1[,11])
+```
+
+Aplicar método QDA
+
+```
+library(MASS)
+p = sum(uci_type1[,11])/548
+modelo_qda <- qda(formula = `In-hospital_death` ~ ., data = uci_type1[,hola], prior = c(1-p,p))
+modelo_qda
+```
+
+```
+predicciones <- predict(object = modelo_qda, newdata = uci_type1[,hola])
+tab <- table(uci_type1[,hola]$`In-hospital_death`, predicciones$class, dnn = c("Clase real", "Clase predicha"))
+tab
+```
+
+Aquí obtenemos una tabla con las predicciones del modelo y los datos reales. A continuación se calcula el porcentaje de error. Claramente las predicciones sacertadas se situarán sobre la diagonal, por tanto podemos calcular el error como;$1-\frac{sum(diag(tab))}{sum(tab)}$ don teb es la tabla anterior.
+
+```
+trainig_error <- 100-(sum(diag(tab))/sum(tab)) * 100
+paste("trainig_error =",trainig_error, "%")
+```
+
+Por ejemplo, ¿qué probabilidad hay de que una persona con Creatinine>=4 fallezca en el hospital?
+
+```
+prueba1=filter(uci_type1, Creatinine_mean>=4)
+predicciones1 <- predict(object = modelo_qda, newdata = prueba1)
+tab <- table(predicciones1$class, dnn = c("Clase predicha"))
+tab
+```
+
+¿Hay diferencias por los descriptores generales y el Tipo de UCI en el momento de admisión del paciente?
+
+
+
+
+
+
 
