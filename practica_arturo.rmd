@@ -627,7 +627,23 @@ data_real_tidy %>%
   ggplot(mapping = aes(x=`In-hospital_death`,y=HCO3_mean))+
   geom_boxplot()+
   facet_wrap(~ICUType,nrow=1)
+
+data_real_tidy %>%
+  group_by(ICUType) %>%
+  ggplot(mapping = aes(x=`In-hospital_death`,y=SOFA))+
+  geom_jitter()+
+  facet_wrap(~ICUType,nrow=1)
+
+data_real_tidy %>%
+  group_by(ICUType) %>%
+  ggplot(mapping = aes(x=`In-hospital_death`,y=`SAPS-I`))+
+  geom_jitter()+
+  facet_wrap(~ICUType,nrow=1)
 ```
+
+
+
+
 
 
 ## Correlación entre variables
