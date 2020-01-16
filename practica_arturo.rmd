@@ -31,6 +31,11 @@ library("aplpack")
 # Para el ACP
 library("factoextra")
 library("ggfortify")
+
+library("StatMatch")
+library("philentropy")
+library("cluster")
+
 ```
 
 # Introducción: Physionet 2012 UCI data mortality
@@ -844,6 +849,32 @@ data
 
 #autoplot(mean_data1.acp, data = filter(data_real_tidy, ICUType == 1), colour = data$`In-hospital_death`,
 #         loadings = TRUE, loadings.colour = 'blue', loadings.label = TRUE, loadings.label.size = 3)
+```
+
+
+```{r}
+data_cluster = as.data.frame(select(data_real_tidy,-RecordID, -Height, -Weight,-ends_with("count"), -ends_with("sd")))
+data_cluster
+
+distancia = gower.dist(data_cluster)
+as.data.frame(distancia)
+
+hola=pam(x= head(data_cluster,50),k= 4,metric = "euclidean",stand=FALSE)
+
+fviz_cluster(hola,
+palette = c("#00AFBB", "#FC4E07","yellow", "green"), # color palette
+ellipse.type = "t", # Concentration ellipse
+repel = TRUE, # Avoid label overplotting (slow)
+ggtheme= theme_classic()
+)
+
+table(head(data_cluster$ICUType,50),hola$cluster)
+
+
+clara= clara(x= head(data_cluster,50), 4, metric = "euclidean", stand = FALSE, samples = 5, pamLike = FALSE)
+
+
+table(head(data_cluster$ICUType,50),clara$cluster)
 ```
 
 
