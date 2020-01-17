@@ -915,6 +915,16 @@ Comprobemos que si realmente decidimos coger dimensión 6:
 mean_data1.acp$rotation[,6]
 ```
 
+Al ver que todo nos cuadra, recomendaríamos hacer el ACP de dimensión 6 si lo que priorizamos es explicar el mayor porcentaje de variación.
+
+A la práctica para visualizar decidimos quedarnos con la opción de dimensión 2.
+
+```{r}
+get_eigenvalue(mean_data1.acp)[2,]
+mean_data1.acp$rotation[,2]
+```
+Viendo los coeficientes de las componentes principales junto con su representación:
+
 ```{r}
 fviz_pca_var(mean_data1.acp,
 col.var = "contrib",
@@ -922,7 +932,11 @@ gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),repel = TRUE
 )
 ```
 
-Al ver que todo nos cuadra, decidimos hacer el ACP de dimensión 6. Aún así, esta reducción no nos da un trabajo fácil y cómodo a la hora de hacer las impresiones de los datos.
+Se mantiene que las variables con mayor peso son:
+
+- Dim1 : `Creatinine` y `BUN`
+
+- Dim2 : `SAPS-I`, `SOFA` y `GCS`
 
 ```{r}
 fviz_pca_ind(mean_data1.acp,
@@ -936,14 +950,6 @@ col.var = "#2E9FDF", # color para las variables
 col.ind = "#696969" # color para las observaciones
 )
 
-
-data = filter(data_real_tidy, ICUType == 1)
-data
-
-## ERROR
-
-#autoplot(mean_data1.acp, data = filter(data_real_tidy, ICUType == 1), colour = data$`In-hospital_death`,
-#         loadings = TRUE, loadings.colour = 'blue', loadings.label = TRUE, loadings.label.size = 3)
 ```
 
 
@@ -955,14 +961,18 @@ Obtenemos la distancia de Gower entre todas las variables, sean cuantitativas o 
 
 El data set que usaremos aparecen las 5 variables sólo con el valor de "mean" y quitamos las variables de la altura y peso ya que hasta ahora no las hemos decidido usar para el estudio y preferimos evitar problemas con los datos perdidos indicados con -1.
 
+
+
 ```{r}
 # Para trabajar con el paquete cluster, necesitamos pasar la tibble a data frame.
 # Además decidimos obviar las columnas count y sd de todas las variables
-data_cluster = as.data.frame(select(data_real_tidy,-RecordID, -Height, -Weight,-ends_with("count"), -ends_with("sd")))
-head(data_cluster,5)
+data_gower = as.data.frame(select(data_real_tidy,-RecordID, -Height, -Weight,-ends_with("count"), -ends_with("sd")))
 
-distancia = gower.dist(data_cluster)
+head(data_gower,5)
 
+distancia = gower.dist(head(data_gower))
+
+head(distancia)
 ```
 
 ### K-Medoids
@@ -971,8 +981,18 @@ Decidimos no realizar el clustering por K-means ya que en las impresiones anteri
 
 De hecho, preferimos usar directamente CLARA en vez de K-medoids teniendo un data set tan grande.
 
+Empezaremos con los pacientes que sobreviven en el hospital y usaremos sólo con las 5 variables que hemos elegido en un principio. La idea será comparar cómo se agrupan las UCI's en cada caso.
 ```{r}
-k_medoids = pam(x = head(data_cluster,50),k = 4,metric = "euclidean",stand = FALSE)
+# Creamos el cluster para los pacientes que sobreviven
+data_cluster_vivos = filter(data_real_tidy, `In-hospital_death` == 0) %>%
+                      select(contains("mean"))
+data_cluster_vivos
+
+# Normalizamos las variables
+data_cluster_vivos = scale(data_cluster_vivos, center = TRUE, scale = TRUE)
+
+
+k_medoids = pam(x = head(data_cluster_vivos,100),k = 4,metric = "euclidean",stand = FALSE)
 
 # Si lo hacemos directamente con R sin especificar absolutamente nada, te hace 4 grupos pero para nada clasifica por UCI
 fviz_cluster(k_medoids,
@@ -981,22 +1001,55 @@ ellipse.type = "t", # Concentration ellipse
 repel = TRUE, # Avoid label overplotting (slow)
 ggtheme= theme_classic()
 )
+```
 
 
+
+```{r}
+# Cluster para los pacientes que mueren
+data_cluster_muertos = filter(data_real_tidy, `In-hospital_death` == 1) %>%
+                      select(contains("mean"))
+data_cluster_muertos
+
+# Normalizamos las variables
+data_cluster_muertos = scale(data_cluster_muertos, center = TRUE, scale = TRUE)
+
+
+k_medoids = pam(x = head(data_cluster_muertos,100),k = 4,metric = "euclidean",stand = FALSE)
+
+# Si lo hacemos directamente con R sin especificar absolutamente nada, te hace 4 grupos pero para nada clasifica por UCI
+fviz_cluster(k_medoids,
+palette = c("#00AFBB", "#FC4E07","yellow", "green"), # color palette
+ellipse.type = "t", # Concentration ellipse
+repel = TRUE, # Avoid label overplotting (slow)
+ggtheme= theme_classic()
+)
+```
+
+Los gráficos se solapan bastante en ambos casos. Las variables que usamos no caracterizan demasiado el tipo de UCI, ya lo habíamos visto anteriormente.
+
+Aún así, sólo estamos cogiendo los 100 primeros datos para que no salgan los gráficos llenos de puntos, así que suponemos que los cambios que existen entre el cluster de vida y el cluster de muerte se dan a que no hay el mismo número de pacientes en cada UCI.
+
+Si hubiésemos hecho el cluster con la distancia de Gower, no seríamos capaces de sacar conclusiones significativas ya que no llegamos a compreder como se interpretan las distancias entre las variables cualitativas que tenemos. Por ejemplo, cómo interpretar la distancia entre hombre y mujer, o entre los datos de Survival.
+
+Aún así, los cálculos serían los siguientes. (sin separar entre UCI.)
+
+```{r}
 # Si probamos a hacer clara directamente por distancia euclidea, vemos que clasifica bastante mal cuando printamos la tabla siguiente
-clara = clara( x = head(data_cluster,100), 4, metric = "euclidean", stand = FALSE, samples = 5, pamLike = FALSE)
-table(head(data_cluster,100)$ICUType, clara$cluster)
-
-
+clara = clara( x = head(data_gower,100), 4, metric = "euclidean", stand = FALSE, samples = 5, pamLike = FALSE)
+table(head(data_gower,100)$ICUType, clara$cluster)
 
 # Si probamos a usar las distancias gower que hemos calculado arriba, aunque no sabemos printarlo en gráfica de puntos
-clusters <- pam(x = as.data.frame(distancia), k = 4, diss = TRUE)
+clusters <- pam(x = as.dist(distancia), k = 4, diss = TRUE)
 head(clusters$clustering,10)
+
 ```
 
 
 
 # Análisis discriminante
+
+Tenemos problemas a la hora cargar la variable x, con lo cual no podemos sacar conclusiones. Las líneas de código que hay a continuación es cómo se debería hacer si nos cargase bien los datos.
 
 ## Primero separamos los datos por cada UCI y luego estudiamos la normalidad de las variables que hemos escogido para ver si aplicamos análisis discriminante lineal o cuadrático.
 ```
@@ -1044,7 +1097,9 @@ library(biotools)
 boxM(data = uci_type1[,hola], grouping = uci_type1[,11])
 ```
 
-Aplicar método QDA
+Aplicar método QDA o LDA, ilustramos el ejemplo como si fuese un QDA
+
+
 
 ```
 library(MASS)
@@ -1074,10 +1129,7 @@ predicciones1 <- predict(object = modelo_qda, newdata = prueba1)
 tab <- table(predicciones1$class, dnn = c("Clase predicha"))
 tab
 ```
-
-¿Hay diferencias por los descriptores generales y el Tipo de UCI en el momento de admisión del paciente?
-
-
+  
 
 
 
